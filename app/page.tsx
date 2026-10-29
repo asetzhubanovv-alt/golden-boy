@@ -15,8 +15,33 @@ import {
 import { useStoredItems, useTodayDate } from "@/lib/use-stored-items";
 
 type TimeFilter = "all" | "today" | "week";
+type StatusFilter = "all" | "searching" | "found" | "returned";
+
+const statusLabels: Record<Exclude<StatusFilter, "all">, string> = {
+  searching: "Ищется",
+  found: "Найдено",
+  returned: "Возвращено",
+};
+
+function isStatusFilter(value: string): value is StatusFilter {
+  return (
+    value === "all" ||
+    value === "searching" ||
+    value === "found" ||
+    value === "returned"
+  );
+}
 
 const categories = ["Все категории", ...ITEM_CATEGORIES];
+
+function Magnifier() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+      <circle cx="10.8" cy="10.8" r="6.8" />
+      <path d="m16 16 4.2 4.2" />
+    </svg>
+  );
+}
 
 function Pin() {
   return (
@@ -32,9 +57,10 @@ export default function Home() {
   const [typeFilter, setTypeFilter] = useState<"all" | ItemType>("all");
   const [category, setCategory] = useState("Все категории");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const { items: storedItems, error: storageError } = useStoredItems();
   const today = useTodayDate();
-  const items = getAllItems(storedItems);
+  const items = useMemo(() => getAllItems(storedItems), [storedItems]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("ru");
@@ -50,8 +76,17 @@ export default function Home() {
           : item.daysAgo;
       const matchesQuery =
         !normalizedQuery ||
-        item.title.toLocaleLowerCase("ru").includes(normalizedQuery);
+        [
+          item.title,
+          item.category,
+          item.place,
+          item.details,
+        ].some((value) =>
+          value.toLocaleLowerCase("ru").includes(normalizedQuery),
+        );
       const matchesType = typeFilter === "all" || item.type === typeFilter;
+      const matchesStatus =
+        statusFilter === "all" || item.status === statusFilter;
       const matchesCategory =
         category === "Все категории" || item.category === category;
       const matchesTime =
@@ -59,15 +94,22 @@ export default function Home() {
         (timeFilter === "today" && age === 0) ||
         (timeFilter === "week" && age >= 0 && age <= 7);
 
-      return matchesQuery && matchesType && matchesCategory && matchesTime;
+      return (
+        matchesQuery &&
+        matchesType &&
+        matchesStatus &&
+        matchesCategory &&
+        matchesTime
+      );
     });
-  }, [category, items, query, timeFilter, today, typeFilter]);
+  }, [category, items, query, statusFilter, timeFilter, today, typeFilter]);
 
   function resetFilters() {
     setQuery("");
     setTypeFilter("all");
     setCategory("Все категории");
     setTimeFilter("all");
+    setStatusFilter("all");
   }
 
   return (
@@ -104,14 +146,13 @@ export default function Home() {
             onSubmit={(event) => event.preventDefault()}
           >
             <label className="search-field">
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-                <circle cx="10.8" cy="10.8" r="6.8" />
-                <path d="m16 16 4.2 4.2" />
-              </svg>
-              <span className="visually-hidden">Поиск по названию вещи</span>
+              <Magnifier />
+              <span className="visually-hidden">
+                Поиск по названию, месту или описанию
+              </span>
               <input
                 type="search"
-                placeholder="Что ищем? Например, наушники"
+                placeholder="Что ищем? Например, наушники или библиотека"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -188,6 +229,24 @@ export default function Home() {
               </button>
             ))}
           </div>
+          <label className="status-filter">
+            <span className="visually-hidden">Статус объявления</span>
+            <select
+              onChange={(event) => {
+                if (isStatusFilter(event.target.value)) {
+                  setStatusFilter(event.target.value);
+                }
+              }}
+              value={statusFilter}
+            >
+              <option value="all">Любой статус</option>
+              {Object.entries(statusLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <div className="results-row" aria-live="polite">
@@ -198,7 +257,8 @@ export default function Home() {
           {(query ||
             category !== "Все категории" ||
             typeFilter !== "all" ||
-            timeFilter !== "all") && (
+            timeFilter !== "all" ||
+            statusFilter !== "all") && (
             <button className="reset-button" onClick={resetFilters} type="button">
               Сбросить фильтры <span aria-hidden="true">×</span>
             </button>

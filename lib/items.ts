@@ -16,6 +16,7 @@ export type Item = {
   details: string;
   telegram?: string;
   imageDataUrl?: string;
+  ownerId?: string;
 };
 
 export type ItemReport = {
@@ -191,7 +192,8 @@ function isItem(value: unknown): value is Item {
     typeof item.details === "string" &&
     (item.date === undefined || typeof item.date === "string") &&
     (item.telegram === undefined || typeof item.telegram === "string") &&
-    (item.imageDataUrl === undefined || typeof item.imageDataUrl === "string")
+    (item.imageDataUrl === undefined || typeof item.imageDataUrl === "string") &&
+    (item.ownerId === undefined || typeof item.ownerId === "string")
   );
 }
 
@@ -245,11 +247,19 @@ export function saveItem(item: Item): void {
   notifyItemsChanged();
 }
 
-export function updateStoredItem(id: string, updates: Partial<Item>): Item {
+export function updateStoredItem(
+  id: string,
+  ownerId: string,
+  updates: Partial<Item>,
+): Item {
   const storedItems = getStoredItems();
   const itemIndex = storedItems.findIndex((item) => item.id === id);
-  if (itemIndex === -1) {
-    throw new Error("Изменять можно только объявление, созданное в этой демо-версии.");
+  if (
+    itemIndex === -1 ||
+    storedItems[itemIndex].ownerId !== ownerId ||
+    !ownerId
+  ) {
+    throw new Error("Изменять можно только своё демо-объявление.");
   }
 
   const updatedItem = { ...storedItems[itemIndex], ...updates };
@@ -259,10 +269,13 @@ export function updateStoredItem(id: string, updates: Partial<Item>): Item {
   return updatedItem;
 }
 
-export function deleteStoredItem(id: string): void {
+export function deleteStoredItem(id: string, ownerId: string): void {
   const storedItems = getStoredItems();
-  if (!storedItems.some((item) => item.id === id)) {
-    throw new Error("Удалять можно только объявление, созданное в этой демо-версии.");
+  if (
+    !ownerId ||
+    !storedItems.some((item) => item.id === id && item.ownerId === ownerId)
+  ) {
+    throw new Error("Удалять можно только своё демо-объявление.");
   }
 
   window.localStorage.setItem(
@@ -320,6 +333,15 @@ export function getDaysAgo(date: string): number {
   return Math.max(0, Math.floor((todayUtc - selected) / 86_400_000));
 }
 
-export function isStoredItem(id: string, storedItems: Item[]): boolean {
-  return storedItems.some((item) => item.id === id);
+export function isStoredItem(
+  id: string,
+  storedItems: Item[],
+  ownerId?: string,
+): boolean {
+  return storedItems.some(
+    (item) =>
+      item.id === id &&
+      typeof ownerId === "string" &&
+      item.ownerId === ownerId,
+  );
 }
