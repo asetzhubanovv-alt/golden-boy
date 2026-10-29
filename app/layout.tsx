@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Foundly — находки кампуса",
+  title: "Foundly — потерял или нашёл",
   description:
-    "Сервис поиска потерянных и найденных вещей в университетском кампусе.",
+    "Объявления о потерянных и найденных вещах в университетском сообществе.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

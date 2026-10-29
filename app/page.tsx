@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Link from "next/link";
+import { DemoNotice } from "@/app/components/SiteHeader";
 import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
 import {
@@ -59,10 +60,10 @@ export default function Home() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const { items: storedItems, error: storageError } = useStoredItems();
+  const items = useMemo(() => getAllItems(storedItems), [storedItems]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("ru");
-    const items = getAllItems(storedItems);
 
     return items.filter((item) => {
       const matchesQuery =
@@ -83,7 +84,7 @@ export default function Home() {
       const matchesTime =
         timeFilter === "all" ||
         (timeFilter === "today" && item.daysAgo === 0) ||
-        (timeFilter === "week" && item.daysAgo <= 7);
+        (timeFilter === "week" && item.daysAgo >= 0 && item.daysAgo <= 7);
 
       return (
         matchesQuery &&
@@ -93,7 +94,7 @@ export default function Home() {
         matchesTime
       );
     });
-  }, [category, query, statusFilter, storedItems, timeFilter, typeFilter]);
+  }, [category, items, query, statusFilter, timeFilter, typeFilter]);
 
   function resetFilters() {
     setQuery("");
@@ -110,9 +111,9 @@ export default function Home() {
       <section className="hero-section">
         <div className="container hero-content">
           <div className="hero-copy">
-            <span className="eyebrow">
+            <p className="eyebrow">
               <span className="eyebrow-dot" /> Сообщество кампуса
-            </span>
+            </p>
             <h1>
               Потерял или нашёл?
               <br />
@@ -159,11 +160,7 @@ export default function Home() {
                 ))}
               </select>
             </label>
-            <Button
-              className="search-button"
-              type="submit"
-              variant="contained"
-            >
+            <Button className="search-button" type="submit" variant="contained">
               Найти вещь
             </Button>
           </form>
@@ -182,9 +179,10 @@ export default function Home() {
           </div>
           <div className="community-count">
             <span className="online-dot" />
-            <span>Сообщество помогает каждый день</span>
+            <span>Локальная демо-лента</span>
           </div>
         </div>
+        <DemoNotice />
 
         <div className="filter-toolbar">
           <div className="type-tabs" role="group" aria-label="Тип объявления">
@@ -331,11 +329,25 @@ export default function Home() {
         ) : (
           <div className="empty-state">
             <span aria-hidden="true">⌕</span>
-            <h3>Пока ничего не нашлось</h3>
-            <p>Попробуй изменить запрос или сбросить фильтры.</p>
-            <Button className="empty-reset" onClick={resetFilters}>
-              Сбросить фильтры
-            </Button>
+            <h3>
+              {items.length > 0
+                ? "По вашему запросу ничего не нашлось"
+                : "Пока объявлений нет"}
+            </h3>
+            <p>
+              {items.length > 0
+                ? "Попробуйте изменить запрос или сбросить фильтры."
+                : "Создайте первое объявление — оно появится в локальной ленте этого браузера."}
+            </p>
+            {items.length > 0 ? (
+              <Button className="empty-reset" onClick={resetFilters}>
+                Сбросить фильтры
+              </Button>
+            ) : (
+              <Button component={Link} className="empty-reset" href="/add">
+                Создать объявление
+              </Button>
+            )}
           </div>
         )}
 
@@ -345,7 +357,12 @@ export default function Home() {
             <h3>Нашёл что-то важное?</h3>
             <p>Твоя находка может сделать чей-то день лучше.</p>
           </div>
-          <Button className="cta-button" variant="contained" href="/add">
+          <Button
+            className="cta-button"
+            variant="contained"
+            component={Link}
+            href="/add"
+          >
             Опубликовать находку <span aria-hidden="true">→</span>
           </Button>
         </div>
