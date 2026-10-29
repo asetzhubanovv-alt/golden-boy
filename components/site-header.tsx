@@ -1,11 +1,11 @@
-import Button from "@mui/material/Button";
 import Link from "next/link";
+import HeaderAccount from "@/components/header-account";
 
 type SiteHeaderProps = {
-  active?: "feed" | "none";
+  active?: "feed" | "add" | "item";
 };
 
-export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
+export default function SiteHeader({ active }: SiteHeaderProps) {
   return (
     <header className="site-header">
       <div className="header-inner container">
@@ -16,24 +16,29 @@ export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
 
         <nav className="main-nav" aria-label="Основная навигация">
           <Link
+            aria-current={active === "feed" ? "page" : undefined}
             className={`nav-link ${active === "feed" ? "active" : ""}`}
             href="/"
           >
             Лента
           </Link>
-          <Link className="nav-link" href="/about">
-            О проекте
+          <Link
+            aria-current={active === "add" ? "page" : undefined}
+            className={`nav-link ${active === "add" ? "active" : ""}`}
+            href="/add"
+          >
+            Добавить
+          </Link>
+          <Link
+            aria-current={active === "item" ? "page" : undefined}
+            className={`nav-link ${active === "item" ? "active" : ""}`}
+            href="/item/blue-headphones"
+          >
+            Пример
           </Link>
         </nav>
 
-        <div className="header-actions">
-          <Button className="login-button" href="/login">
-            Войти
-          </Button>
-          <Button className="publish-button" variant="contained" href="/add">
-            <span aria-hidden="true">＋</span> Разместить объявление
-          </Button>
-        </div>
+        <HeaderAccount />
       </div>
     </header>
   );

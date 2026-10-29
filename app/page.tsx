@@ -15,6 +15,22 @@ import {
 import { useStoredItems } from "@/lib/use-stored-items";
 
 type TimeFilter = "all" | "today" | "week";
+type StatusFilter = "all" | "searching" | "found" | "returned";
+
+const statusLabels: Record<Exclude<StatusFilter, "all">, string> = {
+  searching: "Ищется",
+  found: "Найдено",
+  returned: "Возвращено",
+};
+
+function isStatusFilter(value: string): value is StatusFilter {
+  return (
+    value === "all" ||
+    value === "searching" ||
+    value === "found" ||
+    value === "returned"
+  );
+}
 
 const categories = ["Все категории", ...ITEM_CATEGORIES];
 
@@ -41,6 +57,7 @@ export default function Home() {
   const [typeFilter, setTypeFilter] = useState<"all" | ItemType>("all");
   const [category, setCategory] = useState("Все категории");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const { items: storedItems, error: storageError } = useStoredItems();
 
   const filteredItems = useMemo(() => {
@@ -50,8 +67,17 @@ export default function Home() {
     return items.filter((item) => {
       const matchesQuery =
         !normalizedQuery ||
-        item.title.toLocaleLowerCase("ru").includes(normalizedQuery);
+        [
+          item.title,
+          item.category,
+          item.place,
+          item.details,
+        ].some((value) =>
+          value.toLocaleLowerCase("ru").includes(normalizedQuery),
+        );
       const matchesType = typeFilter === "all" || item.type === typeFilter;
+      const matchesStatus =
+        statusFilter === "all" || item.status === statusFilter;
       const matchesCategory =
         category === "Все категории" || item.category === category;
       const matchesTime =
@@ -59,15 +85,22 @@ export default function Home() {
         (timeFilter === "today" && item.daysAgo === 0) ||
         (timeFilter === "week" && item.daysAgo <= 7);
 
-      return matchesQuery && matchesType && matchesCategory && matchesTime;
+      return (
+        matchesQuery &&
+        matchesType &&
+        matchesStatus &&
+        matchesCategory &&
+        matchesTime
+      );
     });
-  }, [category, query, storedItems, timeFilter, typeFilter]);
+  }, [category, query, statusFilter, storedItems, timeFilter, typeFilter]);
 
   function resetFilters() {
     setQuery("");
     setTypeFilter("all");
     setCategory("Все категории");
     setTimeFilter("all");
+    setStatusFilter("all");
   }
 
   return (
@@ -105,10 +138,12 @@ export default function Home() {
           >
             <label className="search-field">
               <Magnifier />
-              <span className="visually-hidden">Поиск по названию вещи</span>
+              <span className="visually-hidden">
+                Поиск по названию, месту или описанию
+              </span>
               <input
                 type="search"
-                placeholder="Что ищем? Например, наушники"
+                placeholder="Что ищем? Например, наушники или библиотека"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -188,6 +223,24 @@ export default function Home() {
               </button>
             ))}
           </div>
+          <label className="status-filter">
+            <span className="visually-hidden">Статус объявления</span>
+            <select
+              onChange={(event) => {
+                if (isStatusFilter(event.target.value)) {
+                  setStatusFilter(event.target.value);
+                }
+              }}
+              value={statusFilter}
+            >
+              <option value="all">Любой статус</option>
+              {Object.entries(statusLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <div className="results-row" aria-live="polite">
@@ -198,7 +251,8 @@ export default function Home() {
           {(query ||
             category !== "Все категории" ||
             typeFilter !== "all" ||
-            timeFilter !== "all") && (
+            timeFilter !== "all" ||
+            statusFilter !== "all") && (
             <button className="reset-button" onClick={resetFilters} type="button">
               Сбросить фильтры <span aria-hidden="true">×</span>
             </button>

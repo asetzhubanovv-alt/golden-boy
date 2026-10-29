@@ -19,6 +19,7 @@ import {
   type ItemType,
 } from "@/lib/items";
 import { useTodayDate } from "@/lib/use-stored-items";
+import { useDemoAuth } from "@/lib/use-demo-auth";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -41,6 +42,7 @@ function readImage(file: File): Promise<string> {
 export default function AddItemPage() {
   const router = useRouter();
   const today = useTodayDate();
+  const { user, isReady: isAuthReady, error: authError } = useDemoAuth();
   const [type, setType] = useState<ItemType>("lost");
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
@@ -92,6 +94,10 @@ export default function AddItemPage() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    if (!user) {
+      setError("Войди или зарегистрируйся, чтобы опубликовать объявление.");
+      return;
+    }
     const selectedDate = date || today;
 
     const normalizedTelegram = telegram.trim().replace(/^@/, "");
@@ -125,6 +131,7 @@ export default function AddItemPage() {
         symbol,
         details: details.trim(),
         telegram: normalizedTelegram,
+        ownerId: user.id,
         ...(imageDataUrl ? { imageDataUrl } : {}),
       });
       router.push(`/item/${itemId}`);
@@ -138,9 +145,54 @@ export default function AddItemPage() {
     }
   }
 
+  if (!isAuthReady) {
+    return (
+      <main className="foundly-shell container-fluid px-0">
+        <SiteHeader active="add" />
+        <section className="auth-required-state container">
+          <p>Проверяем демо-аккаунт...</p>
+        </section>
+        <SiteFooter />
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="foundly-shell container-fluid px-0">
+        <SiteHeader active="add" />
+        <section className="auth-required-state container">
+          <span className="section-kicker">ПУБЛИКАЦИЯ ОБЪЯВЛЕНИЯ</span>
+          <h1>Сначала войди в аккаунт</h1>
+          <p>
+            Демо-аккаунт нужен, чтобы сохранить объявление за его автором и
+            управлять его статусом.
+          </p>
+          <Alert className="demo-alert" severity="info">
+            {authError ||
+              "Регистрация работает локально в этом браузере. Это не серверная авторизация."}
+          </Alert>
+          <div className="auth-required-actions">
+            <Button
+              className="detail-primary-button"
+              href="/login"
+              variant="contained"
+            >
+              Войти
+            </Button>
+            <Button className="auth-secondary-button" href="/register">
+              Создать аккаунт
+            </Button>
+          </div>
+        </section>
+        <SiteFooter />
+      </main>
+    );
+  }
+
   return (
     <main className="foundly-shell container-fluid px-0">
-      <SiteHeader />
+      <SiteHeader active="add" />
 
       <section className="form-page">
         <div className="container form-page-container">
