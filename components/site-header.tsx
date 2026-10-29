@@ -1,26 +1,34 @@
+"use client";
+
 import Link from "next/link";
+import { useLanguage } from "@/components/language-provider";
 import HeaderAccount from "@/components/header-account";
 
 type SiteHeaderProps = {
-  active?: "feed" | "add" | "item";
+  active?: "feed" | "add" | "item" | "none";
 };
 
-export default function SiteHeader({ active }: SiteHeaderProps) {
+export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
+  const { language, setLanguage, t } = useLanguage();
+
   return (
     <header className="site-header">
       <div className="header-inner container">
-        <Link className="brand" href="/" aria-label="Foundly — главная">
+        <Link className="brand" href="/" aria-label={t("brand.home")}>
           <span className="brand-mark">f</span>
           <span>foundly</span>
         </Link>
 
-        <nav className="main-nav" aria-label="Основная навигация">
+        <nav className="main-nav" aria-label={t("nav.feed")}>
           <Link
             aria-current={active === "feed" ? "page" : undefined}
             className={`nav-link ${active === "feed" ? "active" : ""}`}
             href="/"
           >
-            Лента
+            {t("nav.feed")}
+          </Link>
+          <Link className="nav-link" href="/about">
+            {t("nav.about")}
           </Link>
           <Link
             aria-current={active === "add" ? "page" : undefined}
@@ -38,7 +46,21 @@ export default function SiteHeader({ active }: SiteHeaderProps) {
           </Link>
         </nav>
 
-        <HeaderAccount />
+        <div className="header-actions">
+          <label className="language-select-wrap">
+            <span>{t("language.label")}:</span>
+            <select
+              aria-label={t("language.label")}
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as "kk" | "ru" | "en")}
+            >
+              <option value="kk">Қазақша</option>
+              <option value="ru">Русский</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <HeaderAccount />
+        </div>
       </div>
     </header>
   );

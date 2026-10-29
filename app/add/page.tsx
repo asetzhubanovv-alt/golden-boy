@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
+import { useLanguage } from "@/components/language-provider";
 import {
   getDaysAgo,
   getItemArt,
@@ -18,6 +19,7 @@ import {
   saveItem,
   type ItemType,
 } from "@/lib/items";
+import { categoryTranslationKey } from "@/lib/messages";
 import { useTodayDate } from "@/lib/use-stored-items";
 import { useDemoAuth } from "@/lib/use-demo-auth";
 
@@ -40,6 +42,7 @@ function readImage(file: File): Promise<string> {
 }
 
 export default function AddItemPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const today = useTodayDate();
   const { user, isReady: isAuthReady, error: authError } = useDemoAuth();
@@ -64,7 +67,7 @@ export default function AddItemPage() {
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
       setImageDataUrl("");
       setImageName("");
-      setImageError("Выбери изображение в формате JPG, PNG или WebP.");
+      setImageError(t("form.error.imageType"));
       event.target.value = "";
       return;
     }
@@ -72,7 +75,7 @@ export default function AddItemPage() {
     if (file.size > MAX_IMAGE_SIZE) {
       setImageDataUrl("");
       setImageName("");
-      setImageError("Размер изображения не должен превышать 5 МБ.");
+      setImageError(t("form.error.imageSize"));
       event.target.value = "";
       return;
     }
@@ -86,7 +89,7 @@ export default function AddItemPage() {
       setImageError(
         imageReadError instanceof Error
           ? imageReadError.message
-          : "Не удалось загрузить изображение.",
+          : t("form.error.uploadImage"),
       );
     }
   }
@@ -102,12 +105,12 @@ export default function AddItemPage() {
 
     const normalizedTelegram = telegram.trim().replace(/^@/, "");
     if (!/^[A-Za-z0-9_]{5,32}$/.test(normalizedTelegram)) {
-      setError("Укажи Telegram-ник: 5–32 символа, только латиница, цифры и _.");
+      setError(t("form.error.telegram"));
       return;
     }
 
     if (!selectedDate) {
-      setError("Укажи дату, когда вещь потеряли или нашли.");
+      setError(t("form.error.date"));
       return;
     }
 
@@ -140,7 +143,7 @@ export default function AddItemPage() {
       setError(
         saveError instanceof Error
           ? saveError.message
-          : "Не удалось сохранить объявление в этом браузере.",
+          : t("form.error.save"),
       );
     }
   }
@@ -197,20 +200,19 @@ export default function AddItemPage() {
       <section className="form-page">
         <div className="container form-page-container">
           <div className="form-breadcrumb">
-            <Link href="/">Лента</Link>
+            <Link href="/">{t("form.breadcrumbFeed")}</Link>
             <span aria-hidden="true">/</span>
-            <span>Новое объявление</span>
+            <span>{t("form.breadcrumbNew")}</span>
           </div>
 
           <div className="form-heading">
-            <span className="section-kicker">ПОМОГИ ВЕЩИ НАЙТИСЬ</span>
-            <h1>Создать объявление</h1>
-            <p>Чем подробнее описание, тем скорее вещь вернётся к владельцу.</p>
+            <span className="section-kicker">{t("form.kicker")}</span>
+              <h1>{t("form.title")}</h1>
+              <p>{t("form.subtitle")}</p>
           </div>
 
           <Alert className="demo-alert" severity="info">
-            Демо-режим: объявление сохранится только в этом браузере. Вход и
-            серверное сохранение пока не подключены.
+            {t("form.demoNotice")}
           </Alert>
 
           <form className="item-form" onSubmit={handleSubmit}>
@@ -222,7 +224,7 @@ export default function AddItemPage() {
 
             <fieldset className="form-group">
               <legend>
-                Что произошло? <span>*</span>
+                {t("form.whatHappened")} <span>*</span>
               </legend>
               <div className="kind-options">
                 <button
@@ -235,8 +237,8 @@ export default function AddItemPage() {
                     ↗
                   </span>
                   <span>
-                    <strong>Я потерял(а)</strong>
-                    <small>Ищу свою вещь</small>
+                    <strong>{t("form.lostByMe")}</strong>
+                    <small>{t("form.findMyItem")}</small>
                   </span>
                 </button>
                 <button
@@ -249,8 +251,8 @@ export default function AddItemPage() {
                     ✳
                   </span>
                   <span>
-                    <strong>Я нашёл(ла)</strong>
-                    <small>Ищу владельца</small>
+                    <strong>{t("form.foundByMe")}</strong>
+                    <small>{t("form.findOwner")}</small>
                   </span>
                 </button>
               </div>
@@ -259,13 +261,13 @@ export default function AddItemPage() {
             <div className="form-two-columns">
               <label className="form-group">
                 <span className="form-label">
-                  Название вещи <span>*</span>
+                  {t("form.itemName")} <span>*</span>
                 </span>
                 <input
                   autoComplete="off"
                   maxLength={80}
                   onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Например, синий зонт"
+                  placeholder={t("form.namePlaceholder")}
                   required
                   value={title}
                 />
@@ -273,7 +275,7 @@ export default function AddItemPage() {
 
               <label className="form-group">
                 <span className="form-label">
-                  Категория <span>*</span>
+                  {t("form.category")} <span>*</span>
                 </span>
                 <select
                   onChange={(event) => setCategory(event.target.value)}
@@ -281,11 +283,13 @@ export default function AddItemPage() {
                   value={category}
                 >
                   <option disabled value="">
-                    Выбери категорию
+                    {t("form.chooseCategory")}
                   </option>
                   {ITEM_CATEGORIES.map((itemCategory) => (
                     <option key={itemCategory} value={itemCategory}>
-                      {itemCategory}
+                      {categoryTranslationKey(itemCategory)
+                        ? t(categoryTranslationKey(itemCategory)!)
+                        : itemCategory}
                     </option>
                   ))}
                 </select>
@@ -293,28 +297,28 @@ export default function AddItemPage() {
             </div>
 
             <label className="form-group">
-              <span className="form-label">Описание</span>
+                <span className="form-label">{t("form.description")}</span>
               <textarea
                 maxLength={1000}
                 onChange={(event) => setDetails(event.target.value)}
-                placeholder="Цвет, марка, особые приметы или что было внутри"
+                placeholder={t("form.descriptionPlaceholder")}
                 rows={4}
                 value={details}
               />
               <span className="field-hint">
-                Не указывай личные данные и точные пароли от устройств.
+                {t("form.privacyHint")}
               </span>
             </label>
 
             <div className="form-two-columns">
               <label className="form-group">
                 <span className="form-label">
-                  Где потеряли или нашли? <span>*</span>
+                  {t("form.location")} <span>*</span>
                 </span>
                 <input
                   maxLength={120}
                   onChange={(event) => setPlace(event.target.value)}
-                  placeholder="Корпус, этаж или аудитория"
+                  placeholder={t("form.locationPlaceholder")}
                   required
                   value={place}
                 />
@@ -322,7 +326,7 @@ export default function AddItemPage() {
 
               <label className="form-group">
                 <span className="form-label">
-                  Дата <span>*</span>
+                  {t("form.date")} <span>*</span>
                 </span>
                 <input
                   max={today}
@@ -335,7 +339,7 @@ export default function AddItemPage() {
             </div>
 
             <div className="form-group">
-              <span className="form-label">Фотография</span>
+              <span className="form-label">{t("form.photo")}</span>
               <label className="upload-area">
                 <input
                   accept="image/jpeg,image/png,image/webp"
@@ -347,7 +351,7 @@ export default function AddItemPage() {
                     className="upload-preview"
                     style={{ backgroundImage: `url("${imageDataUrl}")` }}
                     role="img"
-                    aria-label={`Предпросмотр: ${imageName}`}
+                    aria-label={`${t("form.photo")}: ${imageName}`}
                   />
                 ) : (
                   <span className="upload-icon" aria-hidden="true">
@@ -355,10 +359,10 @@ export default function AddItemPage() {
                   </span>
                 )}
                 <span className="upload-copy">
-                  <strong>{imageName || "Нажми, чтобы добавить фото"}</strong>
-                  <small>JPG, PNG или WebP · до 5 МБ</small>
+                  <strong>{imageName || t("form.addPhoto")}</strong>
+                  <small>{t("form.photoTypes")}</small>
                 </span>
-                <span className="upload-browse">Выбрать файл</span>
+                <span className="upload-browse">{t("form.chooseFile")}</span>
               </label>
               {imageError && (
                 <span className="field-error" role="alert">
@@ -371,7 +375,7 @@ export default function AddItemPage() {
 
             <label className="form-group">
               <span className="form-label">
-                Твой Telegram <span>*</span>
+                {t("form.telegram")} <span>*</span>
               </span>
               <div className="telegram-input">
                 <span aria-hidden="true">@</span>
@@ -386,14 +390,13 @@ export default function AddItemPage() {
                 />
               </div>
               <span className="field-hint">
-                Ник будет виден всем, кто откроет объявление. Без паролей и
-                телефонных номеров.
+                {t("form.telegramHint")}
               </span>
             </label>
 
             <div className="form-submit-row">
               <Link className="cancel-link" href="/">
-                Отмена
+                {t("form.cancel")}
               </Link>
               <Button
                 className="form-submit-button"
@@ -401,15 +404,14 @@ export default function AddItemPage() {
                 type="submit"
                 variant="contained"
               >
-                {isSaving ? "Сохраняем..." : "Опубликовать объявление"}
+                {isSaving ? t("form.saving") : t("form.submit")}
                 <span aria-hidden="true">→</span>
               </Button>
             </div>
           </form>
 
           <p className="form-privacy-note">
-            Публикуя объявление, ты соглашаешься поделиться указанным Telegram
-            ником с посетителями сайта.
+            {t("form.privacyNote")}
           </p>
         </div>
       </section>
