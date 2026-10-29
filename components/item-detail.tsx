@@ -7,6 +7,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
+import { useLanguage } from "@/components/language-provider";
+import { categoryTranslationKey, type Language } from "@/lib/messages";
 import {
   DEMO_ITEMS,
   deleteStoredItem,
@@ -19,26 +21,23 @@ import {
 } from "@/lib/items";
 import { useStoredItems } from "@/lib/use-stored-items";
 
-const reportReasons = [
-  "Объявление не соответствует правилам",
-  "Это спам или реклама",
-  "Указаны чужие личные данные",
-  "Другое",
-];
-
-const statusLabels: Record<ItemStatus, string> = {
-  searching: "Ищем владельца",
-  found: "Найдено",
-  returned: "Возвращено",
-};
-
-function formattedDate(item: Item) {
-  if (!item.date) return formatItemDate(item.daysAgo, item.time);
+function formattedDate(item: Item, language: Language) {
+  if (!item.date) {
+    if (item.daysAgo === 0) return `${language === "en" ? "Today" : language === "kk" ? "Бүгін" : "Сегодня"}, ${item.time}`;
+    if (item.daysAgo === 1) return `${language === "en" ? "Yesterday" : language === "kk" ? "Кеше" : "Вчера"}, ${item.time}`;
+    if (language === "en") return `${item.daysAgo} days ago, ${item.time}`;
+    if (language === "kk") return `${item.daysAgo} күн бұрын, ${item.time}`;
+    return formatItemDate(item.daysAgo, item.time);
+  }
   const [year, month, day] = item.date.split("-");
-  return `${day}.${month}.${year}`;
+  const locale = language === "kk" ? "kk-KZ" : language === "en" ? "en-US" : "ru-RU";
+  return new Intl.DateTimeFormat(locale).format(
+    new Date(Number(year), Number(month) - 1, Number(day)),
+  );
 }
 
 export default function ItemDetail({ id }: { id: string }) {
+  const { language, t } = useLanguage();
   const router = useRouter();
   const { items: storedItems, error: storageError, isReady } = useStoredItems();
   const [actionError, setActionError] = useState("");
@@ -49,6 +48,17 @@ export default function ItemDetail({ id }: { id: string }) {
     DEMO_ITEMS.find((demoItem) => demoItem.id === id) ??
     null;
   const isOwnDemoItem = isStoredItem(id, storedItems);
+  const statusLabels: Record<ItemStatus, string> = {
+    searching: t("status.searching"),
+    found: t("status.found"),
+    returned: t("status.returned"),
+  };
+  const reportReasons = [
+    t("detail.reportRule"),
+    t("detail.reportSpam"),
+    t("detail.reportPrivacy"),
+    t("detail.reportOther"),
+  ];
 
   function handleStatusChange(status: ItemStatus) {
     setActionError("");
@@ -58,13 +68,13 @@ export default function ItemDetail({ id }: { id: string }) {
       setActionError(
         updateError instanceof Error
           ? updateError.message
-          : "Не удалось обновить статус.",
+          : t("detail.error.update"),
       );
     }
   }
 
   function handleDelete() {
-    if (!window.confirm("Удалить это объявление? Отменить действие нельзя.")) {
+    if (!window.confirm(t("detail.deleteConfirm"))) {
       return;
     }
 
@@ -76,7 +86,7 @@ export default function ItemDetail({ id }: { id: string }) {
       setActionError(
         deleteError instanceof Error
           ? deleteError.message
-          : "Не удалось удалить объявление.",
+          : t("detail.error.delete"),
       );
     }
   }
@@ -86,21 +96,21 @@ export default function ItemDetail({ id }: { id: string }) {
     setReportMessage("");
     setActionError("");
     if (!reportReason) {
-      setActionError("Выбери причину жалобы.");
+      setActionError(t("detail.chooseReason"));
       return;
     }
 
     try {
       saveItemReport(id, reportReason);
       setReportMessage(
-        "Жалоба сохранена в этом браузере. В демо-режиме её никто не получит.",
+        t("detail.reportSaved"),
       );
       setReportReason("");
     } catch (reportError) {
       setActionError(
         reportError instanceof Error
           ? reportError.message
-          : "Не удалось сохранить жалобу.",
+          : t("detail.error.report"),
       );
     }
   }
@@ -109,7 +119,7 @@ export default function ItemDetail({ id }: { id: string }) {
     return (
       <main className="foundly-shell container-fluid px-0">
         <SiteHeader />
-        <div className="detail-loading">Загружаем объявление...</div>
+        <div className="detail-loading">{t("detail.loading")}</div>
       </main>
     );
   }
@@ -120,9 +130,9 @@ export default function ItemDetail({ id }: { id: string }) {
         <SiteHeader />
         <section className="detail-not-found container">
           <span aria-hidden="true">⌕</span>
-          <h1>Объявление не найдено</h1>
+          <h1>{t("detail.notFound")}</h1>
           <p>
-            Возможно, оно было удалено или ссылка скопирована с ошибкой.
+            {t("detail.notFoundDescription")}
           </p>
           {(storageError || actionError) && (
             <Alert severity="error">{storageError || actionError}</Alert>
@@ -132,7 +142,7 @@ export default function ItemDetail({ id }: { id: string }) {
             href="/"
             variant="contained"
           >
-            Вернуться в ленту
+            {t("detail.backToFeed")}
           </Button>
         </section>
         <SiteFooter />
@@ -168,7 +178,7 @@ export default function ItemDetail({ id }: { id: string }) {
               </>
             )}
             <span className={`detail-type-badge ${item.type}`}>
-              {item.type === "lost" ? "ПОТЕРЯЛИ" : "НАЙДЕНО"}
+              {item.type === "lost" ? t("detail.lost") : t("detail.found")}
             </span>
           </div>
 
@@ -177,12 +187,14 @@ export default function ItemDetail({ id }: { id: string }) {
               <span className={`status-label ${item.status}`}>
                 <span /> {statusLabels[item.status]}
               </span>
-              {isOwnDemoItem && <span className="demo-owner-label">Твоё демо-объявление</span>}
+              {isOwnDemoItem && <span className="demo-owner-label">{t("detail.ownItem")}</span>}
             </div>
 
             <h1>{item.title}</h1>
             <span className="category-label detail-category">
-              {item.category}
+              {categoryTranslationKey(item.category)
+                ? t(categoryTranslationKey(item.category)!)
+                : item.category}
             </span>
 
             {(storageError || actionError) && (
@@ -198,29 +210,29 @@ export default function ItemDetail({ id }: { id: string }) {
 
             <dl className="detail-facts">
               <div>
-                <dt>Место</dt>
+                <dt>{t("detail.place")}</dt>
                 <dd>
                   <span aria-hidden="true">⌖</span> {item.place}
                 </dd>
               </div>
               <div>
-                <dt>Дата публикации</dt>
+                <dt>{t("detail.published")}</dt>
                 <dd>
-                  <span aria-hidden="true">◷</span> {formattedDate(item)}
+                  <span aria-hidden="true">◷</span> {formattedDate(item, language)}
                 </dd>
               </div>
             </dl>
 
             <div className="detail-description">
-              <h2>Описание</h2>
-              <p>{item.details || "Автор не добавил описание."}</p>
+                <h2>{t("detail.description")}</h2>
+                <p>{item.details || t("detail.noDescription")}</p>
             </div>
 
             {item.telegram && (
               <div className="detail-contact">
                 <div>
-                  <h2>Связаться с автором</h2>
-                  <p>Напиши в Telegram, чтобы уточнить детали.</p>
+                  <h2>{t("detail.contact")}</h2>
+                  <p>{t("detail.contactHint")}</p>
                 </div>
                 <Button
                   className="detail-primary-button"
@@ -230,14 +242,14 @@ export default function ItemDetail({ id }: { id: string }) {
                   target="_blank"
                   variant="contained"
                 >
-                  Написать в Telegram <span aria-hidden="true">↗</span>
+                  {t("detail.messageTelegram")} <span aria-hidden="true">↗</span>
                 </Button>
               </div>
             )}
 
             {isOwnDemoItem && (
               <div className="owner-actions">
-                <label htmlFor="item-status">Статус объявления</label>
+                <label htmlFor="item-status">{t("detail.status")}</label>
                 <select
                   id="item-status"
                   onChange={(event) => {
@@ -263,15 +275,15 @@ export default function ItemDetail({ id }: { id: string }) {
                   onClick={handleDelete}
                   variant="outlined"
                 >
-                  Удалить объявление
+                  {t("detail.delete")}
                 </Button>
               </div>
             )}
 
             <details className="report-box">
-              <summary>Пожаловаться на объявление</summary>
+              <summary>{t("detail.report")}</summary>
               <form onSubmit={handleReport}>
-                <label htmlFor="report-reason">Причина жалобы</label>
+                <label htmlFor="report-reason">{t("detail.reportReason")}</label>
                 <select
                   id="report-reason"
                   onChange={(event) => setReportReason(event.target.value)}
@@ -279,7 +291,7 @@ export default function ItemDetail({ id }: { id: string }) {
                   value={reportReason}
                 >
                   <option disabled value="">
-                    Выбери причину
+                    {t("detail.chooseReason")}
                   </option>
                   {reportReasons.map((reason) => (
                     <option key={reason} value={reason}>
@@ -292,17 +304,17 @@ export default function ItemDetail({ id }: { id: string }) {
                   type="submit"
                   variant="outlined"
                 >
-                  Отправить жалобу
+                  {t("detail.sendReport")}
                 </Button>
               </form>
-              <p>В демо-режиме жалоба останется только в этом браузере.</p>
+              <p>{t("detail.reportDemo")}</p>
             </details>
           </article>
         </div>
 
         <div className="detail-back-row">
-          <Link href="/">← Вернуться ко всем объявлениям</Link>
-          <span>Если нашёл вещь — помоги ей вернуться домой.</span>
+          <Link href="/">← {t("detail.backAll")}</Link>
+          <span>{t("detail.backNote")}</span>
         </div>
       </section>
 

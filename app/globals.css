@@ -125,6 +125,27 @@ a {
   gap: 12px;
 }
 
+.language-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid #e8ebe2;
+  border-radius: 6px;
+  color: #697765;
+  font-size: 11px;
+}
+
+.language-select-wrap select {
+  max-width: 90px;
+  border: 0;
+  background: transparent;
+  color: #364337;
+  font: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
 .header-actions .MuiButton-root,
 .search-panel .MuiButton-root,
 .bottom-cta .MuiButton-root {
