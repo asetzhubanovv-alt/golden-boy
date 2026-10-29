@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Foundly
 
-## Getting Started
+Сервис объявлений о потерянных и найденных вещах в университетском кампусе.
+Требования проекта описаны в [TZ.md](./TZ.md).
 
-First, run the development server:
+## Запуск
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Открой [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Страницы MVP
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `/` — лента с поиском и фильтрами.
+- `/add` — форма создания объявления с проверкой полей и фото.
+- `/item/[id]` — подробности, Telegram-контакт, статус, удаление и жалоба.
 
-## Learn More
+## Демо-режим
 
-To learn more about Next.js, take a look at the following resources:
+Подключения Supabase и авторизации пока нет. Новые объявления, статусы и
+жалобы сохраняются в `localStorage` текущего браузера и не отправляются на
+сервер. На главной также есть демонстрационные объявления. Это хранилище
+предназначено только для разработки и не обеспечивает межпользовательский
+доступ или контроль прав.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Технологии
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Next.js App Router и TypeScript
+- Tailwind CSS и Bootstrap
+- Material UI
 
-## Deploy on Vercel
+## Проверки
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```

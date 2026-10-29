@@ -4,115 +4,19 @@ import { useMemo, useState } from "react";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Link from "next/link";
+import SiteFooter from "@/components/site-footer";
+import SiteHeader from "@/components/site-header";
+import {
+  formatItemDate,
+  getAllItems,
+  ITEM_CATEGORIES,
+  type ItemType,
+} from "@/lib/items";
+import { useStoredItems } from "@/lib/use-stored-items";
 
-type ItemType = "lost" | "found";
 type TimeFilter = "all" | "today" | "week";
 
-type Item = {
-  id: string;
-  title: string;
-  category: string;
-  type: ItemType;
-  place: string;
-  daysAgo: number;
-  time: string;
-  status: "searching" | "found" | "returned";
-  art: string;
-  symbol: string;
-  details: string;
-};
-
-const categories = [
-  "Все категории",
-  "Электроника",
-  "Документы",
-  "Ключи",
-  "Одежда",
-  "Сумки",
-  "Книги",
-  "Другое",
-];
-
-const items: Item[] = [
-  {
-    id: "blue-headphones",
-    title: "Наушники Sony",
-    category: "Электроника",
-    type: "lost",
-    place: "Библиотека, 2 этаж",
-    daysAgo: 0,
-    time: "12:40",
-    status: "searching",
-    art: "art-blue",
-    symbol: "♫",
-    details: "Синие беспроводные наушники в чехле. Последний раз видел(а) в читальном зале.",
-  },
-  {
-    id: "student-card",
-    title: "Студенческий билет",
-    category: "Документы",
-    type: "found",
-    place: "Главный корпус, холл",
-    daysAgo: 0,
-    time: "11:15",
-    status: "searching",
-    art: "art-peach",
-    symbol: "ID",
-    details: "Нашёл(ла) студенческий билет у входа в главный корпус. Передал(а) на стойку охраны.",
-  },
-  {
-    id: "keychain",
-    title: "Связка ключей с брелоком",
-    category: "Ключи",
-    type: "found",
-    place: "Корпус Б, аудитория 204",
-    daysAgo: 1,
-    time: "16:20",
-    status: "searching",
-    art: "art-green",
-    symbol: "✳",
-    details: "Три ключа на кольце и небольшой зелёный брелок. Оставил(а) у охраны корпуса.",
-  },
-  {
-    id: "black-backpack",
-    title: "Чёрный рюкзак",
-    category: "Сумки",
-    type: "lost",
-    place: "Спортивный зал",
-    daysAgo: 2,
-    time: "18:05",
-    status: "searching",
-    art: "art-lilac",
-    symbol: "▣",
-    details: "Небольшой чёрный рюкзак с нашивкой. Внутри были конспекты и зарядка.",
-  },
-  {
-    id: "chemistry-notes",
-    title: "Тетрадь по химии",
-    category: "Книги",
-    type: "found",
-    place: "Кафетерий",
-    daysAgo: 3,
-    time: "13:30",
-    status: "returned",
-    art: "art-yellow",
-    symbol: "✎",
-    details: "Клетчатая тетрадь с записями по органической химии. Уже ждёт владельца у администратора.",
-  },
-  {
-    id: "silver-ring",
-    title: "Серебряное кольцо",
-    category: "Другое",
-    type: "found",
-    place: "Корпус А, аудитория 108",
-    daysAgo: 5,
-    time: "10:10",
-    status: "searching",
-    art: "art-rose",
-    symbol: "○",
-    details: "Небольшое серебристое кольцо найдено после пары. Напишите, если это ваша вещь.",
-  },
-];
+const categories = ["Все категории", ...ITEM_CATEGORIES];
 
 function Magnifier() {
   return (
@@ -132,20 +36,16 @@ function Pin() {
   );
 }
 
-function formatItemDate(daysAgo: number, time: string) {
-  if (daysAgo === 0) return `Сегодня, ${time}`;
-  if (daysAgo === 1) return `Вчера, ${time}`;
-  return `${daysAgo} ${daysAgo < 5 ? "дня" : "дней"} назад, ${time}`;
-}
-
 export default function Home() {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | ItemType>("all");
   const [category, setCategory] = useState("Все категории");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const { items: storedItems, error: storageError } = useStoredItems();
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("ru");
+    const items = getAllItems(storedItems);
 
     return items.filter((item) => {
       const matchesQuery =
@@ -161,7 +61,7 @@ export default function Home() {
 
       return matchesQuery && matchesType && matchesCategory && matchesTime;
     });
-  }, [category, query, timeFilter, typeFilter]);
+  }, [category, query, storedItems, timeFilter, typeFilter]);
 
   function resetFilters() {
     setQuery("");
@@ -172,32 +72,7 @@ export default function Home() {
 
   return (
     <main className="foundly-shell container-fluid px-0">
-      <header className="site-header">
-        <div className="header-inner container">
-          <Link className="brand" href="/" aria-label="Foundly — главная">
-            <span className="brand-mark">f</span>
-            <span>foundly</span>
-          </Link>
-
-          <nav className="main-nav" aria-label="Основная навигация">
-            <Link className="nav-link active" href="/">
-              Лента
-            </Link>
-            <Link className="nav-link" href="/about">
-              О проекте
-            </Link>
-          </nav>
-
-          <div className="header-actions">
-            <Button className="login-button" href="/login">
-              Войти
-            </Button>
-            <Button className="publish-button" variant="contained" href="/add">
-              <span aria-hidden="true">＋</span> Разместить объявление
-            </Button>
-          </div>
-        </div>
-      </header>
+      <SiteHeader active="feed" />
 
       <section className="hero-section">
         <div className="container hero-content">
@@ -330,6 +205,12 @@ export default function Home() {
           )}
         </div>
 
+        {storageError && (
+          <div className="storage-message" role="alert">
+            {storageError}
+          </div>
+        )}
+
         {filteredItems.length > 0 ? (
           <div className="row g-4 item-grid">
             {filteredItems.map((item) => (
@@ -339,10 +220,21 @@ export default function Home() {
                   href={`/item/${item.id}`}
                   aria-label={`Открыть объявление: ${item.title}`}
                 >
-                  <div className={`item-art ${item.art}`}>
-                    <span className="art-shape art-shape-one" />
-                    <span className="art-shape art-shape-two" />
-                    <span className="art-symbol">{item.symbol}</span>
+                  <div
+                    className={`item-art ${item.art}${item.imageDataUrl ? " has-photo" : ""}`}
+                    style={
+                      item.imageDataUrl
+                        ? { backgroundImage: `url("${item.imageDataUrl}")` }
+                        : undefined
+                    }
+                  >
+                    {!item.imageDataUrl && (
+                      <>
+                        <span className="art-shape art-shape-one" />
+                        <span className="art-shape art-shape-two" />
+                        <span className="art-symbol">{item.symbol}</span>
+                      </>
+                    )}
                     <Chip
                       className={`type-badge ${item.type}`}
                       label={item.type === "lost" ? "ПОТЕРЯЛИ" : "НАЙДЕНО"}
@@ -405,13 +297,7 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="site-footer container">
-        <Link className="footer-brand" href="/">
-          foundly<span>.</span>
-        </Link>
-        <span>Создано для людей и вещей, которые должны найтись.</span>
-        <Link href="/about">О проекте</Link>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }
