@@ -20,6 +20,7 @@ import {
   type ItemStatus,
 } from "@/lib/items";
 import { useStoredItems } from "@/lib/use-stored-items";
+import { useDemoAuth } from "@/lib/use-demo-auth";
 
 function formattedDate(item: Item, language: Language) {
   if (!item.date) {
@@ -40,6 +41,7 @@ export default function ItemDetail({ id }: { id: string }) {
   const { language, t } = useLanguage();
   const router = useRouter();
   const { items: storedItems, error: storageError, isReady } = useStoredItems();
+  const { user, isReady: isAuthReady } = useDemoAuth();
   const [actionError, setActionError] = useState("");
   const [reportReason, setReportReason] = useState("");
   const [reportMessage, setReportMessage] = useState("");
@@ -47,7 +49,10 @@ export default function ItemDetail({ id }: { id: string }) {
     storedItems.find((storedItem) => storedItem.id === id) ??
     DEMO_ITEMS.find((demoItem) => demoItem.id === id) ??
     null;
-  const isOwnDemoItem = isStoredItem(id, storedItems);
+  const isOwnDemoItem =
+    isReady &&
+    isAuthReady &&
+    isStoredItem(id, storedItems, user?.id);
   const statusLabels: Record<ItemStatus, string> = {
     searching: t("status.searching"),
     found: t("status.found"),
@@ -63,7 +68,8 @@ export default function ItemDetail({ id }: { id: string }) {
   function handleStatusChange(status: ItemStatus) {
     setActionError("");
     try {
-      updateStoredItem(id, { status });
+      if (!user) throw new Error("Войди в свой демо-аккаунт.");
+      updateStoredItem(id, user.id, { status });
     } catch (updateError) {
       setActionError(
         updateError instanceof Error
@@ -80,7 +86,8 @@ export default function ItemDetail({ id }: { id: string }) {
 
     setActionError("");
     try {
-      deleteStoredItem(id);
+      if (!user) throw new Error("Войди в свой демо-аккаунт.");
+      deleteStoredItem(id, user.id);
       router.push("/");
     } catch (deleteError) {
       setActionError(
@@ -115,7 +122,7 @@ export default function ItemDetail({ id }: { id: string }) {
     }
   }
 
-  if (!isReady) {
+  if (!isReady || !isAuthReady) {
     return (
       <main className="foundly-shell container-fluid px-0">
         <SiteHeader />
@@ -127,7 +134,7 @@ export default function ItemDetail({ id }: { id: string }) {
   if (!item) {
     return (
       <main className="foundly-shell container-fluid px-0">
-        <SiteHeader />
+        <SiteHeader active="item" />
         <section className="detail-not-found container">
           <span aria-hidden="true">⌕</span>
           <h1>{t("detail.notFound")}</h1>
@@ -152,7 +159,7 @@ export default function ItemDetail({ id }: { id: string }) {
 
   return (
     <main className="foundly-shell container-fluid px-0">
-      <SiteHeader />
+      <SiteHeader active="item" />
 
       <section className="detail-page container">
         <div className="form-breadcrumb">

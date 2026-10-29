@@ -1,9 +1,11 @@
-import Button from "@mui/material/Button";
+"use client";
+
 import Link from "next/link";
 import { useLanguage } from "@/components/language-provider";
+import HeaderAccount from "@/components/header-account";
 
 type SiteHeaderProps = {
-  active?: "feed" | "none";
+  active?: "feed" | "add" | "item" | "none";
 };
 
 export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
@@ -19,6 +21,7 @@ export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
 
         <nav className="main-nav" aria-label={t("nav.feed")}>
           <Link
+            aria-current={active === "feed" ? "page" : undefined}
             className={`nav-link ${active === "feed" ? "active" : ""}`}
             href="/"
           >
@@ -26,6 +29,20 @@ export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
           </Link>
           <Link className="nav-link" href="/about">
             {t("nav.about")}
+          </Link>
+          <Link
+            aria-current={active === "add" ? "page" : undefined}
+            className={`nav-link ${active === "add" ? "active" : ""}`}
+            href="/add"
+          >
+            Добавить
+          </Link>
+          <Link
+            aria-current={active === "item" ? "page" : undefined}
+            className={`nav-link ${active === "item" ? "active" : ""}`}
+            href="/item/blue-headphones"
+          >
+            Пример
           </Link>
         </nav>
 
@@ -42,12 +59,7 @@ export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
               <option value="en">English</option>
             </select>
           </label>
-          <Button className="login-button" href="/login">
-            {t("nav.login")}
-          </Button>
-          <Button className="publish-button" variant="contained" href="/add">
-            <span aria-hidden="true">＋</span> {t("nav.publish")}
-          </Button>
+          <HeaderAccount />
         </div>
       </div>
     </header>

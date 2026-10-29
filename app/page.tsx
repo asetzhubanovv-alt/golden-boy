@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Link from "next/link";
+import { DemoNotice } from "@/app/components/SiteHeader";
 import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
 import { getAllItems } from "@/lib/items";
@@ -11,6 +12,22 @@ import { useStoredItems } from "@/lib/use-stored-items";
 import { useLanguage } from "@/components/language-provider";
 
 type TimeFilter = "all" | "today" | "week";
+type StatusFilter = "all" | "searching" | "found" | "returned";
+
+const statusLabels: Record<Exclude<StatusFilter, "all">, string> = {
+  searching: "Ищется",
+  found: "Найдено",
+  returned: "Возвращено",
+};
+
+function isStatusFilter(value: string): value is StatusFilter {
+  return (
+    value === "all" ||
+    value === "searching" ||
+    value === "found" ||
+    value === "returned"
+  );
+}
 
 type Language = "kk" | "ru" | "en";
 type ItemType = "lost" | "found";
@@ -482,7 +499,9 @@ export default function Home() {
   const [typeFilter, setTypeFilter] = useState<"all" | ItemType>("all");
   const [category, setCategory] = useState<string>("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const { items: storedItems, error: storageError } = useStoredItems();
+  const items = useMemo(() => getAllItems(storedItems), [storedItems]);
 
   const t = translations[language];
 
@@ -493,29 +512,47 @@ export default function Home() {
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase(language);
-    const items = getAllItems(storedItems);
 
     return items.filter((item) => {
       const localizedItem = localizedDemoItems.find((entry) => entry.id === item.id);
       const titleText = (localizedItem?.title[language] ?? item.title).toLocaleLowerCase(language);
-      const matchesQuery = !normalizedQuery || titleText.includes(normalizedQuery);
+      const searchableText = [
+        titleText,
+        localizedItem?.place[language] ?? item.place,
+        localizedItem?.details[language] ?? item.details,
+        item.category,
+      ];
+      const matchesQuery =
+        !normalizedQuery ||
+        searchableText.some((value) =>
+          value.toLocaleLowerCase(language).includes(normalizedQuery),
+        );
       const matchesType = typeFilter === "all" || item.type === typeFilter;
+      const matchesStatus =
+        statusFilter === "all" || item.status === statusFilter;
       const itemCategory = localizedItem?.categoryKey ?? categoryKeyByName[item.category];
       const matchesCategory = category === "all" || itemCategory === category;
       const matchesTime =
         timeFilter === "all" ||
         (timeFilter === "today" && item.daysAgo === 0) ||
-        (timeFilter === "week" && item.daysAgo <= 7);
+        (timeFilter === "week" && item.daysAgo >= 0 && item.daysAgo <= 7);
 
-      return matchesQuery && matchesType && matchesCategory && matchesTime;
+      return (
+        matchesQuery &&
+        matchesType &&
+        matchesStatus &&
+        matchesCategory &&
+        matchesTime
+      );
     });
-  }, [category, language, query, storedItems, timeFilter, typeFilter]);
+  }, [category, items, language, query, statusFilter, timeFilter, typeFilter]);
 
   function resetFilters() {
     setQuery("");
     setTypeFilter("all");
     setCategory("all");
     setTimeFilter("all");
+    setStatusFilter("all");
   }
 
   return (
@@ -588,6 +625,7 @@ export default function Home() {
             <span>{t.sections.community}</span>
           </div>
         </div>
+        <DemoNotice />
 
         <div className="filter-toolbar">
           <div className="type-tabs" role="group" aria-label="Type filter">
@@ -622,6 +660,24 @@ export default function Home() {
               </button>
             ))}
           </div>
+          <label className="status-filter">
+            <span className="visually-hidden">Статус объявления</span>
+            <select
+              onChange={(event) => {
+                if (isStatusFilter(event.target.value)) {
+                  setStatusFilter(event.target.value);
+                }
+              }}
+              value={statusFilter}
+            >
+              <option value="all">Любой статус</option>
+              {Object.entries(statusLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <div className="results-row" aria-live="polite">
@@ -632,7 +688,8 @@ export default function Home() {
           {(query ||
             category !== "all" ||
             typeFilter !== "all" ||
-            timeFilter !== "all") && (
+            timeFilter !== "all" ||
+            statusFilter !== "all") && (
             <button className="reset-button" onClick={resetFilters} type="button">
               {t.filters.reset} <span aria-hidden="true">×</span>
             </button>
