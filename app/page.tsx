@@ -1,30 +1,22 @@
 "use client";
 
-import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
 import Link from "next/link";
+import { useMemo, useState } from "react";
+import { DemoNotice, SiteHeader } from "@/app/components/SiteHeader";
 import SiteFooter from "@/components/site-footer";
-import SiteHeader from "@/components/site-header";
 import {
   formatItemDate,
   getAllItems,
   ITEM_CATEGORIES,
   type ItemType,
 } from "@/lib/items";
-import { useStoredItems } from "@/lib/use-stored-items";
+import { useStoredItems, useTodayDate } from "@/lib/use-stored-items";
 
 type TimeFilter = "all" | "today" | "week";
 
 const categories = ["Все категории", ...ITEM_CATEGORIES];
-
-function Magnifier() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-      <circle cx="10.8" cy="10.8" r="6.8" />
-      <path d="m16 16 4.2 4.2" />
-    </svg>
-  );
-}
 
 function Pin() {
   return (
@@ -41,14 +33,21 @@ export default function Home() {
   const [category, setCategory] = useState("Все категории");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const { items: storedItems, error: storageError } = useStoredItems();
+  const today = useTodayDate();
+  const items = getAllItems(storedItems);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("ru");
-    const items = getAllItems(storedItems);
 
     return items.filter((item) => {
-      const itemDate = new Date(`${item.date}T00:00:00`);
-      const age = Math.floor((today.getTime() - itemDate.getTime()) / 86_400_000);
+      const itemDate = item.date ? new Date(`${item.date}T00:00:00`) : null;
+      const todayDate = today ? new Date(`${today}T00:00:00`) : null;
+      const age =
+        itemDate && todayDate
+          ? Math.floor(
+              (todayDate.getTime() - itemDate.getTime()) / 86_400_000,
+            )
+          : item.daysAgo;
       const matchesQuery =
         !normalizedQuery ||
         item.title.toLocaleLowerCase("ru").includes(normalizedQuery);
@@ -62,7 +61,7 @@ export default function Home() {
 
       return matchesQuery && matchesType && matchesCategory && matchesTime;
     });
-  }, [category, query, storedItems, timeFilter, typeFilter]);
+  }, [category, items, query, timeFilter, today, typeFilter]);
 
   function resetFilters() {
     setQuery("");
@@ -73,7 +72,7 @@ export default function Home() {
 
   return (
     <main className="foundly-shell container-fluid px-0">
-      <SiteHeader active="feed" />
+      <SiteHeader />
 
       <section className="hero-section">
         <div className="container hero-content">

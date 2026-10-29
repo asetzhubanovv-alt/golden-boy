@@ -140,6 +140,12 @@ export default function ItemDetail({ id }: { id: string }) {
     );
   }
 
+  const telegramUsername = item.telegram?.trim().replace(/^@/, "");
+  const validTelegramUsername =
+    telegramUsername && /^[A-Za-z0-9_]{5,32}$/.test(telegramUsername)
+      ? telegramUsername
+      : null;
+
   return (
     <main className="foundly-shell container-fluid px-0">
       <SiteHeader />
@@ -216,7 +222,7 @@ export default function ItemDetail({ id }: { id: string }) {
               <p>{item.details || "Автор не добавил описание."}</p>
             </div>
 
-            {item.telegram && (
+            {validTelegramUsername ? (
               <div className="detail-contact">
                 <div>
                   <h2>Связаться с автором</h2>
@@ -225,7 +231,7 @@ export default function ItemDetail({ id }: { id: string }) {
                 <Button
                   className="detail-primary-button"
                   component="a"
-                  href={`https://t.me/${encodeURIComponent(item.telegram)}`}
+                  href={`https://t.me/${validTelegramUsername}`}
                   rel="noreferrer"
                   target="_blank"
                   variant="contained"
@@ -233,10 +239,25 @@ export default function ItemDetail({ id }: { id: string }) {
                   Написать в Telegram <span aria-hidden="true">↗</span>
                 </Button>
               </div>
+            ) : (
+              <div className="detail-contact">
+                <div>
+                  <h2>Связаться с автором</h2>
+                  <p>
+                    {item.telegram
+                      ? "Telegram-ник указан в неверном формате."
+                      : "Автор не указал Telegram для связи."}
+                  </p>
+                </div>
+              </div>
             )}
 
             {isOwnDemoItem && (
               <div className="owner-actions">
+                <Alert severity="warning">
+                  Демо-режим: действия сохраняются только в этом браузере.
+                  Входа и серверной проверки прав пока нет.
+                </Alert>
                 <label htmlFor="item-status">Статус объявления</label>
                 <select
                   id="item-status"

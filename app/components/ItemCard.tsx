@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Chip } from "@mui/material";
 import type { Item } from "@/lib/items";
 import { formatItemDate } from "@/lib/items";
 
@@ -29,7 +28,9 @@ export function ItemCard({ item }: { item: Item }) {
         <span className={`type-badge ${item.type}`}>
           {item.type === "lost" ? "ПОТЕРЯЛИ" : "НАЙДЕНО"}
         </span>
-        <span className="art-date">{formatItemDate(item.date)}</span>
+        <span className="art-date">
+          {formatItemDate(item.daysAgo, item.time)}
+        </span>
       </div>
       <div className="item-card-content">
         <div className="item-card-title-row">
@@ -45,7 +46,10 @@ export function ItemCard({ item }: { item: Item }) {
           </span>
         </div>
         <p className="item-description">
-          {item.description || (item.type === "lost" ? "Помогите найти эту вещь." : "Помогите найти владельца этой вещи.")}
+          {item.details ||
+            (item.type === "lost"
+              ? "Помогите найти эту вещь."
+              : "Помогите найти владельца этой вещи.")}
         </p>
         <div className="item-card-footer">
           <span className={`status-label ${item.status}`}>
