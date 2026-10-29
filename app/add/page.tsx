@@ -1,457 +1,368 @@
 "use client";
 
+import {
+  type ChangeEvent,
+  type FormEvent,
+  useState,
+} from "react";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
-import MenuItem from "@mui/material/MenuItem";
-import TextField from "@mui/material/TextField";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ChangeEvent, type FormEvent, useState } from "react";
-import { DemoNotice, SiteHeader } from "@/app/components/SiteHeader";
+import SiteFooter from "@/components/site-footer";
+import SiteHeader from "@/components/site-header";
 import {
+  getDaysAgo,
+  getItemArt,
   ITEM_CATEGORIES,
   saveItem,
-  type Item,
   type ItemType,
 } from "@/lib/items";
+import { useTodayDate } from "@/lib/use-stored-items";
 
-type FormValues = {
-  type: ItemType | "";
-  title: string;
-  category: string;
-  description: string;
-  place: string;
-  date: string;
-  telegram: string;
-};
-
-type FieldErrors = Partial<Record<keyof FormValues | "photo", string>>;
-
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
-const ACCEPTED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const TELEGRAM_PATTERN = /^[A-Za-z0-9_]{5,32}$/;
-
-function getToday(): string {
-  const now = new Date();
-  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  return localDate.toISOString().slice(0, 10);
-}
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 function readImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-      } else {
-        reject(new Error("Не удалось подготовить изображение."));
+      if (typeof reader.result !== "string") {
+        reject(new Error("Не удалось прочитать изображение."));
+        return;
       }
+      resolve(reader.result);
     };
-    reader.onerror = () => reject(new Error("Не удалось прочитать выбранный файл."));
+    reader.onerror = () => reject(new Error("Не удалось прочитать изображение."));
     reader.readAsDataURL(file);
   });
 }
 
 export default function AddItemPage() {
   const router = useRouter();
-  const [values, setValues] = useState<FormValues>({
-    type: "",
-    title: "",
-    category: "",
-    description: "",
-    place: "",
-    date: getToday(),
-    telegram: "",
-  });
-  const [photo, setPhoto] = useState<string>();
-  const [photoName, setPhotoName] = useState("");
-  const [errors, setErrors] = useState<FieldErrors>({});
-  const [submitError, setSubmitError] = useState("");
+  const today = useTodayDate();
+  const [type, setType] = useState<ItemType>("lost");
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [details, setDetails] = useState("");
+  const [place, setPlace] = useState("");
+  const [date, setDate] = useState("");
+  const [telegram, setTelegram] = useState("");
+  const [imageDataUrl, setImageDataUrl] = useState("");
+  const [imageName, setImageName] = useState("");
+  const [error, setError] = useState("");
+  const [imageError, setImageError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  function updateValue(field: keyof FormValues, value: string) {
-    setValues((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: undefined }));
-    setSubmitError("");
-  }
-
-  async function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
+    setImageError("");
+    if (!file) return;
 
-    if (!ACCEPTED_PHOTO_TYPES.includes(file.type)) {
-      setErrors((current) => ({
-        ...current,
-        photo: "Выберите изображение в формате JPG, PNG или WebP.",
-      }));
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setImageDataUrl("");
+      setImageName("");
+      setImageError("Выбери изображение в формате JPG, PNG или WebP.");
       event.target.value = "";
       return;
     }
 
-    if (file.size > MAX_PHOTO_BYTES) {
-      setErrors((current) => ({
-        ...current,
-        photo: "Файл слишком большой. Максимальный размер — 5 МБ.",
-      }));
+    if (file.size > MAX_IMAGE_SIZE) {
+      setImageDataUrl("");
+      setImageName("");
+      setImageError("Размер изображения не должен превышать 5 МБ.");
       event.target.value = "";
       return;
     }
 
     try {
-      const image = await readImage(file);
-      setPhoto(image);
-      setPhotoName(file.name);
-      setErrors((current) => ({ ...current, photo: undefined }));
-    } catch (error) {
-      setErrors((current) => ({
-        ...current,
-        photo:
-          error instanceof Error
-            ? error.message
-            : "Не удалось прочитать выбранное изображение.",
-      }));
-      event.target.value = "";
+      setImageDataUrl(await readImage(file));
+      setImageName(file.name);
+    } catch (imageReadError) {
+      setImageDataUrl("");
+      setImageName("");
+      setImageError(
+        imageReadError instanceof Error
+          ? imageReadError.message
+          : "Не удалось загрузить изображение.",
+      );
     }
-  }
-
-  function validate(): FieldErrors {
-    const nextErrors: FieldErrors = {};
-    if (!values.type) nextErrors.type = "Выберите тип объявления.";
-    if (!values.title.trim()) nextErrors.title = "Укажите название вещи.";
-    if (!values.category) nextErrors.category = "Выберите категорию.";
-    if (!values.place.trim()) nextErrors.place = "Укажите корпус или аудиторию.";
-    if (!values.date) nextErrors.date = "Укажите дату.";
-    if (!values.telegram.trim()) {
-      nextErrors.telegram = "Укажите Telegram-ник для связи.";
-    } else if (!TELEGRAM_PATTERN.test(values.telegram.trim())) {
-      nextErrors.telegram =
-        "Ник должен содержать 5–32 символа: латинские буквы, цифры или подчёркивание.";
-    }
-    return nextErrors;
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextErrors = validate();
-    setErrors(nextErrors);
-    setSubmitError("");
+    setError("");
+    const selectedDate = date || today;
 
-    if (Object.keys(nextErrors).length > 0) {
+    const normalizedTelegram = telegram.trim().replace(/^@/, "");
+    if (!/^[A-Za-z0-9_]{5,32}$/.test(normalizedTelegram)) {
+      setError("Укажи Telegram-ник: 5–32 символа, только латиница, цифры и _.");
+      return;
+    }
+
+    if (!selectedDate) {
+      setError("Укажи дату, когда вещь потеряли или нашли.");
       return;
     }
 
     setIsSaving(true);
-    try {
-      const itemType = values.type;
-      const category = ITEM_CATEGORIES.find(
-        (candidate) => candidate === values.category,
-      );
-      if (!itemType || !category) {
-        setSubmitError(
-          "Не удалось проверить тип или категорию. Проверьте обязательные поля.",
-        );
-        setIsSaving(false);
-        return;
-      }
+    const { art, symbol } = getItemArt(category);
+    const now = new Date();
+    const itemId = crypto.randomUUID();
 
-      const item: Item = {
-        id: crypto.randomUUID(),
-        type: itemType,
-        title: values.title.trim(),
+    try {
+      saveItem({
+        id: itemId,
+        title: title.trim(),
         category,
-        description: values.description.trim(),
-        place: values.place.trim(),
-        date: values.date,
-        ...(photo ? { imageDataUrl: photo } : {}),
-        telegram: values.telegram.trim(),
+        type,
+        place: place.trim(),
+        date: selectedDate,
+        daysAgo: getDaysAgo(selectedDate),
+        time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
         status: "searching",
-        createdAt: new Date().toISOString(),
-      };
-      saveItem(item);
-      router.push(`/item/${encodeURIComponent(item.id)}`);
-    } catch (error) {
-      setSubmitError(
-        error instanceof Error
-          ? error.message
-          : "Не удалось сохранить объявление. Попробуйте ещё раз.",
-      );
+        art,
+        symbol,
+        details: details.trim(),
+        telegram: normalizedTelegram,
+        ...(imageDataUrl ? { imageDataUrl } : {}),
+      });
+      router.push(`/item/${itemId}`);
+    } catch (saveError) {
       setIsSaving(false);
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Не удалось сохранить объявление в этом браузере.",
+      );
     }
   }
 
   return (
-    <>
+    <main className="foundly-shell container-fluid px-0">
       <SiteHeader />
-      <main className="container page-container add-page">
-        <div className="page-intro">
-          <Link href="/" className="back-link">
-            <span aria-hidden="true">←</span> К объявлениям
-          </Link>
-          <p className="eyebrow">ПОМОГАЕМ НАЙТИ ВАЖНОЕ</p>
-          <h1>Новое объявление</h1>
-          <p className="page-lead">
-            Расскажите о вещи — возможно, её уже кто-то нашёл.
-          </p>
-        </div>
 
-        <DemoNotice />
+      <section className="form-page">
+        <div className="container form-page-container">
+          <div className="form-breadcrumb">
+            <Link href="/">Лента</Link>
+            <span aria-hidden="true">/</span>
+            <span>Новое объявление</span>
+          </div>
 
-        <form className="row g-4 add-form" onSubmit={handleSubmit} noValidate>
-          <div className="col-12 col-lg-8">
-            <section className="form-panel">
-              <div className="form-section-heading">
-                <span className="section-number">01</span>
-                <div>
-                  <h2>О вещи</h2>
-                  <p>Основная информация поможет её узнать.</p>
-                </div>
-              </div>
+          <div className="form-heading">
+            <span className="section-kicker">ПОМОГИ ВЕЩИ НАЙТИСЬ</span>
+            <h1>Создать объявление</h1>
+            <p>Чем подробнее описание, тем скорее вещь вернётся к владельцу.</p>
+          </div>
 
-              <fieldset className="field-group">
-                <legend className="field-label">
-                  Что произошло? <span className="required-mark">*</span>
-                </legend>
-                <div className="type-options">
-                  {(["lost", "found"] as const).map((type) => (
-                    <label
-                      className={`type-option ${values.type === type ? "selected" : ""}`}
-                      key={type}
-                    >
-                      <input
-                        type="radio"
-                        name="type"
-                        value={type}
-                        checked={values.type === type}
-                        onChange={() => updateValue("type", type)}
-                      />
-                      <span className="type-option-icon" aria-hidden="true">
-                        {type === "lost" ? "⌕" : "✳"}
-                      </span>
-                      <span>
-                        <strong>{type === "lost" ? "Потерял" : "Нашёл"}</strong>
-                        <small>
-                          {type === "lost"
-                            ? "Ищу свою вещь"
-                            : "Нашёл чужую вещь"}
-                        </small>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                {errors.type && (
-                  <span className="field-error" role="alert">
-                    {errors.type}
-                  </span>
-                )}
-              </fieldset>
+          <Alert className="demo-alert" severity="info">
+            Демо-режим: объявление сохранится только в этом браузере. Вход и
+            серверное сохранение пока не подключены.
+          </Alert>
 
-              <div className="field-group">
-                <TextField
-                  label="Название вещи"
-                  value={values.title}
-                  onChange={(event) => updateValue("title", event.target.value)}
-                  placeholder="Например, чёрный кошелёк"
-                  fullWidth
-                  required
-                  error={Boolean(errors.title)}
-                  helperText={errors.title}
-                  inputProps={{ maxLength: 100 }}
-                />
-              </div>
+          <form className="item-form" onSubmit={handleSubmit}>
+            {error && (
+              <Alert className="form-error" severity="error">
+                {error}
+              </Alert>
+            )}
 
-              <div className="field-group">
-                <TextField
-                  select
-                  label="Категория"
-                  value={values.category}
-                  onChange={(event) => updateValue("category", event.target.value)}
-                  fullWidth
-                  required
-                  error={Boolean(errors.category)}
-                  helperText={errors.category}
+            <fieldset className="form-group">
+              <legend>
+                Что произошло? <span>*</span>
+              </legend>
+              <div className="kind-options">
+                <button
+                  aria-pressed={type === "lost"}
+                  className={`kind-option ${type === "lost" ? "selected" : ""}`}
+                  onClick={() => setType("lost")}
+                  type="button"
                 >
-                  <MenuItem value="" disabled>
-                    Выберите категорию
-                  </MenuItem>
-                  {ITEM_CATEGORIES.map((category) => (
-                    <MenuItem key={category} value={category}>
-                      {category}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </div>
-
-              <div className="field-group">
-                <TextField
-                  label="Описание"
-                  value={values.description}
-                  onChange={(event) =>
-                    updateValue("description", event.target.value)
-                  }
-                  placeholder="Цвет, приметы и другие детали"
-                  fullWidth
-                  multiline
-                  minRows={4}
-                  inputProps={{ maxLength: 1000 }}
-                  helperText={`${values.description.length}/1000`}
-                />
-              </div>
-            </section>
-
-            <section className="form-panel">
-              <div className="form-section-heading">
-                <span className="section-number">02</span>
-                <div>
-                  <h2>Где и когда</h2>
-                  <p>Добавьте детали, которые помогут сориентироваться.</p>
-                </div>
-              </div>
-              <div className="row g-3">
-                <div className="col-12 col-sm-7">
-                  <TextField
-                    label="Место"
-                    value={values.place}
-                    onChange={(event) => updateValue("place", event.target.value)}
-                    placeholder="Корпус, аудитория или другое место"
-                    fullWidth
-                    required
-                    error={Boolean(errors.place)}
-                    helperText={errors.place}
-                    inputProps={{ maxLength: 120 }}
-                  />
-                </div>
-                <div className="col-12 col-sm-5">
-                  <TextField
-                    label="Дата"
-                    type="date"
-                    value={values.date}
-                    onChange={(event) => updateValue("date", event.target.value)}
-                    fullWidth
-                    required
-                    error={Boolean(errors.date)}
-                    helperText={errors.date}
-                    slotProps={{ inputLabel: { shrink: true } }}
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section className="form-panel">
-              <div className="form-section-heading">
-                <span className="section-number">03</span>
-                <div>
-                  <h2>Фото</h2>
-                  <p>Изображение не обязательно, но поможет узнать вещь.</p>
-                </div>
-              </div>
-              <div className="photo-upload">
-                <input
-                  id="item-photo"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-                  onChange={handlePhotoChange}
-                />
-                <label className="photo-upload-pick" htmlFor="item-photo">
-                  {photo ? (
-                    <Image
-                      className="photo-preview"
-                      src={photo}
-                      alt="Предпросмотр"
-                      width={134}
-                      height={128}
-                      unoptimized
-                    />
-                  ) : (
-                    <span className="upload-icon" aria-hidden="true">
-                      ↑
-                    </span>
-                  )}
-                  <span className="upload-copy">
-                    <strong>{photoName || "Нажмите, чтобы загрузить фото"}</strong>
-                    <small>JPG, PNG или WebP · до 5 МБ</small>
+                  <span className="kind-icon lost-kind" aria-hidden="true">
+                    ↗
                   </span>
-                </label>
-                {photo && (
-                  <button
-                    className="remove-photo"
-                    type="button"
-                    aria-label="Удалить фотографию"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setPhoto(undefined);
-                      setPhotoName("");
-                    }}
-                  >
-                    ×
-                  </button>
-                )}
+                  <span>
+                    <strong>Я потерял(а)</strong>
+                    <small>Ищу свою вещь</small>
+                  </span>
+                </button>
+                <button
+                  aria-pressed={type === "found"}
+                  className={`kind-option ${type === "found" ? "selected" : ""}`}
+                  onClick={() => setType("found")}
+                  type="button"
+                >
+                  <span className="kind-icon found-kind" aria-hidden="true">
+                    ✳
+                  </span>
+                  <span>
+                    <strong>Я нашёл(ла)</strong>
+                    <small>Ищу владельца</small>
+                  </span>
+                </button>
               </div>
-              {errors.photo && (
+            </fieldset>
+
+            <div className="form-two-columns">
+              <label className="form-group">
+                <span className="form-label">
+                  Название вещи <span>*</span>
+                </span>
+                <input
+                  autoComplete="off"
+                  maxLength={80}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="Например, синий зонт"
+                  required
+                  value={title}
+                />
+              </label>
+
+              <label className="form-group">
+                <span className="form-label">
+                  Категория <span>*</span>
+                </span>
+                <select
+                  onChange={(event) => setCategory(event.target.value)}
+                  required
+                  value={category}
+                >
+                  <option disabled value="">
+                    Выбери категорию
+                  </option>
+                  {ITEM_CATEGORIES.map((itemCategory) => (
+                    <option key={itemCategory} value={itemCategory}>
+                      {itemCategory}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label className="form-group">
+              <span className="form-label">Описание</span>
+              <textarea
+                maxLength={1000}
+                onChange={(event) => setDetails(event.target.value)}
+                placeholder="Цвет, марка, особые приметы или что было внутри"
+                rows={4}
+                value={details}
+              />
+              <span className="field-hint">
+                Не указывай личные данные и точные пароли от устройств.
+              </span>
+            </label>
+
+            <div className="form-two-columns">
+              <label className="form-group">
+                <span className="form-label">
+                  Где потеряли или нашли? <span>*</span>
+                </span>
+                <input
+                  maxLength={120}
+                  onChange={(event) => setPlace(event.target.value)}
+                  placeholder="Корпус, этаж или аудитория"
+                  required
+                  value={place}
+                />
+              </label>
+
+              <label className="form-group">
+                <span className="form-label">
+                  Дата <span>*</span>
+                </span>
+                <input
+                  max={today}
+                  onChange={(event) => setDate(event.target.value)}
+                  required
+                  type="date"
+                  value={date || today}
+                />
+              </label>
+            </div>
+
+            <div className="form-group">
+              <span className="form-label">Фотография</span>
+              <label className="upload-area">
+                <input
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleImageChange}
+                  type="file"
+                />
+                {imageDataUrl ? (
+                  <span
+                    className="upload-preview"
+                    style={{ backgroundImage: `url("${imageDataUrl}")` }}
+                    role="img"
+                    aria-label={`Предпросмотр: ${imageName}`}
+                  />
+                ) : (
+                  <span className="upload-icon" aria-hidden="true">
+                    ↑
+                  </span>
+                )}
+                <span className="upload-copy">
+                  <strong>{imageName || "Нажми, чтобы добавить фото"}</strong>
+                  <small>JPG, PNG или WebP · до 5 МБ</small>
+                </span>
+                <span className="upload-browse">Выбрать файл</span>
+              </label>
+              {imageError && (
                 <span className="field-error" role="alert">
-                  {errors.photo}
+                  {imageError}
                 </span>
               )}
-            </section>
-          </div>
+            </div>
 
-          <div className="col-12 col-lg-4">
-            <aside className="form-aside">
-              <section className="form-panel contact-panel">
-                <div className="form-section-heading">
-                  <span className="section-number">04</span>
-                  <div>
-                    <h2>Как связаться</h2>
-                    <p>Чтобы вам могли написать по объявлению.</p>
-                  </div>
-                </div>
-                <TextField
-                  label="Telegram-ник"
-                  value={values.telegram}
-                  onChange={(event) =>
-                    updateValue("telegram", event.target.value.replace(/^@/, ""))
-                  }
+            <div className="form-divider" />
+
+            <label className="form-group">
+              <span className="form-label">
+                Твой Telegram <span>*</span>
+              </span>
+              <div className="telegram-input">
+                <span aria-hidden="true">@</span>
+                <input
+                  autoComplete="off"
+                  maxLength={33}
+                  onChange={(event) => setTelegram(event.target.value)}
+                  pattern="@?[A-Za-z0-9_]{5,32}"
                   placeholder="username"
-                  fullWidth
                   required
-                  error={Boolean(errors.telegram)}
-                  helperText={
-                    errors.telegram || "От 5 до 32 символов, без символа @"
-                  }
-                  inputProps={{ maxLength: 32, autoCapitalize: "none" }}
-                  slotProps={{ input: { startAdornment: "@" } }}
+                  value={telegram}
                 />
-                <Alert severity="warning" className="contact-warning">
-                  Контакт будет публичным в опубликованном объявлении. Сейчас это
-                  только локальная демо-версия: данные остаются в вашем браузере.
-                </Alert>
-              </section>
+              </div>
+              <span className="field-hint">
+                Ник будет виден всем, кто откроет объявление. Без паролей и
+                телефонных номеров.
+              </span>
+            </label>
 
-              <section className="form-panel publish-panel">
-                {submitError && (
-                  <Alert severity="error" className="submit-error">
-                    {submitError}
-                  </Alert>
-                )}
-                <Button
-                  type="submit"
-                  variant="contained"
-                  fullWidth
-                  disabled={isSaving}
-                  className="publish-button"
-                >
-                  {isSaving ? "Сохраняем…" : "Сохранить объявление"}
-                </Button>
-                <p>Объявление сохранится только на этом устройстве.</p>
-                <Link href="/" className="cancel-link">
-                  Отменить
-                </Link>
-              </section>
-            </aside>
-          </div>
-        </form>
-      </main>
-    </>
+            <div className="form-submit-row">
+              <Link className="cancel-link" href="/">
+                Отмена
+              </Link>
+              <Button
+                className="form-submit-button"
+                disabled={isSaving}
+                type="submit"
+                variant="contained"
+              >
+                {isSaving ? "Сохраняем..." : "Опубликовать объявление"}
+                <span aria-hidden="true">→</span>
+              </Button>
+            </div>
+          </form>
+
+          <p className="form-privacy-note">
+            Публикуя объявление, ты соглашаешься поделиться указанным Telegram
+            ником с посетителями сайта.
+          </p>
+        </div>
+      </section>
+
+      <SiteFooter />
+    </main>
   );
 }

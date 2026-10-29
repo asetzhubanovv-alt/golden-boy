@@ -3,48 +3,48 @@
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { DemoNotice, SiteHeader } from "@/app/components/SiteHeader";
-import { ItemCard } from "@/app/components/ItemCard";
-import { getItems, type Item, type ItemType } from "@/lib/items";
+import SiteFooter from "@/components/site-footer";
+import SiteHeader from "@/components/site-header";
+import {
+  formatItemDate,
+  getAllItems,
+  ITEM_CATEGORIES,
+  type ItemType,
+} from "@/lib/items";
+import { useStoredItems } from "@/lib/use-stored-items";
 
 type TimeFilter = "all" | "today" | "week";
 
-const categories = [
-  "Все категории",
-  "Электроника",
-  "Документы и карты",
-  "Ключи",
-  "Одежда",
-  "Сумки и рюкзаки",
-  "Книги и тетради",
-  "Другое",
-];
+const categories = ["Все категории", ...ITEM_CATEGORIES];
+
+function Magnifier() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+      <circle cx="10.8" cy="10.8" r="6.8" />
+      <path d="m16 16 4.2 4.2" />
+    </svg>
+  );
+}
+
+function Pin() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+      <path d="M19 10.1c0 5.2-7 11-7 11s-7-5.8-7-11a7 7 0 1 1 14 0Z" />
+      <circle cx="12" cy="10" r="2.2" />
+    </svg>
+  );
+}
 
 export default function Home() {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | ItemType>("all");
   const [category, setCategory] = useState("Все категории");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
-  const [items, setItems] = useState<Item[]>([]);
-  const [loadError, setLoadError] = useState("");
-
-  useEffect(() => {
-    try {
-      setItems(getItems());
-    } catch (error) {
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : "Не удалось загрузить сохранённые объявления.",
-      );
-    }
-  }, []);
+  const { items: storedItems, error: storageError } = useStoredItems();
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("ru");
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const items = getAllItems(storedItems);
 
     return items.filter((item) => {
       const itemDate = new Date(`${item.date}T00:00:00`);
@@ -62,7 +62,7 @@ export default function Home() {
 
       return matchesQuery && matchesType && matchesCategory && matchesTime;
     });
-  }, [category, items, query, timeFilter, typeFilter]);
+  }, [category, query, storedItems, timeFilter, typeFilter]);
 
   function resetFilters() {
     setQuery("");
@@ -73,7 +73,7 @@ export default function Home() {
 
   return (
     <main className="foundly-shell container-fluid px-0">
-      <SiteHeader />
+      <SiteHeader active="feed" />
 
       <section className="hero-section">
         <div className="container hero-content">
@@ -206,15 +206,72 @@ export default function Home() {
           )}
         </div>
 
-        {loadError ? (
-          <Alert severity="error" className="feed-alert">
-            {loadError}
-          </Alert>
-        ) : filteredItems.length > 0 ? (
+        {storageError && (
+          <div className="storage-message" role="alert">
+            {storageError}
+          </div>
+        )}
+
+        {filteredItems.length > 0 ? (
           <div className="row g-4 item-grid">
             {filteredItems.map((item) => (
               <div className="col-12 col-sm-6 col-lg-4" key={item.id}>
-                <ItemCard item={item} />
+                <Link
+                  className="item-card"
+                  href={`/item/${item.id}`}
+                  aria-label={`Открыть объявление: ${item.title}`}
+                >
+                  <div
+                    className={`item-art ${item.art}${item.imageDataUrl ? " has-photo" : ""}`}
+                    style={
+                      item.imageDataUrl
+                        ? { backgroundImage: `url("${item.imageDataUrl}")` }
+                        : undefined
+                    }
+                  >
+                    {!item.imageDataUrl && (
+                      <>
+                        <span className="art-shape art-shape-one" />
+                        <span className="art-shape art-shape-two" />
+                        <span className="art-symbol">{item.symbol}</span>
+                      </>
+                    )}
+                    <Chip
+                      className={`type-badge ${item.type}`}
+                      label={item.type === "lost" ? "ПОТЕРЯЛИ" : "НАЙДЕНО"}
+                      size="small"
+                    />
+                    <span className="art-date">
+                      {formatItemDate(item.daysAgo, item.time)}
+                    </span>
+                  </div>
+                  <div className="item-card-content">
+                    <div className="item-card-title-row">
+                      <h3>{item.title}</h3>
+                      <span className="item-arrow" aria-hidden="true">
+                        ↗
+                      </span>
+                    </div>
+                    <div className="item-meta">
+                      <span className="category-label">{item.category}</span>
+                      <span className="place-label">
+                        <Pin /> {item.place}
+                      </span>
+                    </div>
+                    <p className="item-description">{item.details}</p>
+                    <div className="item-card-footer">
+                      <span className={`status-label ${item.status}`}>
+                        <span />{" "}
+                        {item.status === "returned"
+                          ? "Возвращено"
+                          : item.status === "found"
+                            ? "Найдено"
+                            : "Ищем владельца"}
+                      </span>
+                      <span className="card-open">Подробнее</span>
+                    </div>
+                  </div>
+                </Link>
               </div>
             ))}
           </div>
@@ -260,13 +317,7 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="site-footer container">
-        <Link className="footer-brand" href="/">
-          foundly<span>.</span>
-        </Link>
-        <span>Создано для людей и вещей, которые должны найтись.</span>
-        <Link href="/about">О проекте</Link>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }
