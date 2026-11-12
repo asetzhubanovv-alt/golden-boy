@@ -33,6 +33,7 @@ import { useFavoriteItems } from "@/lib/use-favorite-items";
 import { getLostItemProgress, getSimilarFoundItems } from "@/lib/item-matching";
 import { OPEN_NOTIFICATIONS_EVENT } from "@/lib/use-item-notifications";
 import { useItemNotifications } from "@/lib/use-item-notifications";
+import OwnershipVerification from "@/components/ownership-verification";
 
 function formattedDate(item: Item, language: Language) {
   if (!item.date) {
@@ -397,6 +398,15 @@ export default function ItemDetail({ id }: { id: string }) {
                 <h2>{t("detail.description")}</h2>
                 <p>{item.details || t("detail.noDescription")}</p>
             </div>
+
+            {!isExampleItem && item.type === "found" && itemOwnerId && (
+              <OwnershipVerification
+                itemId={item.id}
+                ownerId={itemOwnerId}
+                isClosed={item.status === "returned"}
+                userId={user?.id ?? null}
+              />
+            )}
 
             {isOwnItem && item.type === "lost" && (() => {
               const matches = getSimilarFoundItems(item, storedItems);

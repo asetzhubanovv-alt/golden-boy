@@ -702,3 +702,138 @@ create policy "Users delete their chat attachments"
     bucket_id = 'chat-attachments'
     and (storage.foldername(name))[2] = (select auth.uid())::text
   );
+
+create table if not exists public.ownership_claims (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references public.items(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  message text not null
+    check (char_length(btrim(message)) between 10 and 1200),
+  status text not null default 'pending'
+    check (status in ('pending', 'confirmed', 'rejected')),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ownership_claims_item_created_at_idx
+  on public.ownership_claims (item_id, created_at desc);
+create index if not exists ownership_claims_user_item_idx
+  on public.ownership_claims (user_id, item_id);
+create unique index if not exists ownership_claims_one_pending_per_user_idx
+  on public.ownership_claims (item_id, user_id)
+  where status = 'pending';
+create unique index if not exists ownership_claims_one_confirmed_per_item_idx
+  on public.ownership_claims (item_id)
+  where status = 'confirmed';
+
+alter table public.ownership_claims enable row level security;
+revoke all on public.ownership_claims from public, anon, authenticated;
+grant select on public.ownership_claims to authenticated;
+grant insert (item_id, user_id, message)
+  on public.ownership_claims to authenticated;
+grant update (status) on public.ownership_claims to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.ownership_claims;
+exception when duplicate_object then null;
+end
+$$;
+
+create or replace function public.prevent_claim_after_ownership_confirmation()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if tg_op = 'INSERT' then
+    if exists (
+      select 1
+      from public.items i
+      join public.chat_user_blocks b
+        on (b.blocker_id = new.user_id and b.blocked_id = i.user_id)
+        or (b.blocker_id = i.user_id and b.blocked_id = new.user_id)
+      where i.id = new.item_id
+    ) then
+      raise exception 'This listing is unavailable.'
+        using errcode = '42501';
+    end if;
+  end if;
+
+  if new.status = 'pending' and exists (
+    select 1
+    from public.ownership_claims c
+    where c.item_id = new.item_id and c.status = 'confirmed'
+  ) then
+    raise exception 'An owner has already been confirmed for this listing.'
+      using errcode = '23505';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.prevent_claim_after_ownership_confirmation()
+  from public, anon, authenticated;
+
+drop trigger if exists prevent_claim_after_ownership_confirmation
+  on public.ownership_claims;
+create trigger prevent_claim_after_ownership_confirmation
+  before insert or update on public.ownership_claims
+  for each row execute function public.prevent_claim_after_ownership_confirmation();
+
+drop policy if exists "Claimants and listing owners read ownership claims"
+  on public.ownership_claims;
+create policy "Claimants and listing owners read ownership claims"
+  on public.ownership_claims for select to authenticated
+  using (
+    public.is_active_user()
+    and (
+      user_id = (select auth.uid())
+      or exists (
+        select 1 from public.items i
+        where i.id = ownership_claims.item_id
+          and i.user_id = (select auth.uid())
+      )
+    )
+  );
+
+drop policy if exists "Active users submit ownership claims"
+  on public.ownership_claims;
+create policy "Active users submit ownership claims"
+  on public.ownership_claims for insert to authenticated
+  with check (
+    user_id = (select auth.uid())
+    and public.is_active_user()
+    and exists (
+      select 1
+      from public.items i
+      join public.profiles owner on owner.id = i.user_id
+      where i.id = ownership_claims.item_id
+        and i.user_id <> (select auth.uid())
+        and i.type = 'found'
+        and i.status = 'active'
+        and not owner.is_blocked
+    )
+  );
+
+drop policy if exists "Listing owners review pending ownership claims"
+  on public.ownership_claims;
+create policy "Listing owners review pending ownership claims"
+  on public.ownership_claims for update to authenticated
+  using (
+    public.is_active_user()
+    and status = 'pending'
+    and exists (
+      select 1 from public.items i
+      where i.id = ownership_claims.item_id
+        and i.user_id = (select auth.uid())
+    )
+  )
+  with check (
+    status in ('confirmed', 'rejected')
+    and exists (
+      select 1 from public.items i
+      where i.id = ownership_claims.item_id
+        and i.user_id = (select auth.uid())
+    )
+  );
