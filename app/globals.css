@@ -8160,6 +8160,51 @@ html[data-theme="dark"] .header-user-avatar:focus-visible {
   letter-spacing: 0.06em;
 }
 
+.messages-blocked-user {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.messages-blocked-user-profile {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 3px;
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.messages-blocked-user-profile strong,
+.messages-blocked-user-profile small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.messages-blocked-user-profile strong {
+  font-size: 12px;
+}
+
+.messages-blocked-user-profile small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.messages-blocked-user .MuiButton-root {
+  min-width: 0;
+  padding: 5px 8px;
+  border-color: var(--line);
+  border-radius: 8px;
+  color: var(--foreground);
+  font-size: 10px;
+  line-height: 1.4;
+  text-transform: none;
+}
+
 .messages-list-item-context {
   color: var(--green) !important;
   font-weight: 650;

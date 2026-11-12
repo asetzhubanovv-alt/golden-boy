@@ -19,6 +19,7 @@ import { useLanguage } from "@/components/language-provider";
 import { useDemoAuth } from "@/lib/use-demo-auth";
 import {
   createOrGetConversation,
+  getBlockedChatUsers,
   getConversationMessages,
   getConversations,
   markConversationRead,
@@ -27,9 +28,11 @@ import {
   reportChat,
   setChatConversationState,
   sendChatMessage,
+  unblockChatUser,
   uploadChatAttachments,
   subscribeToConversations,
   subscribeToConversation,
+  type ChatBlockedUser,
   type ChatConversation,
   type ChatMessage,
 } from "@/lib/chat";
@@ -60,11 +63,14 @@ export default function MessagesPage() {
   const { language, t } = useLanguage();
   const { user, isReady } = useDemoAuth();
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const [blockedUsers, setBlockedUsers] = useState<ChatBlockedUser[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [usernameQuery, setUsernameQuery] = useState("");
   const [draft, setDraft] = useState("");
   const [fileDraft, setFileDraft] = useState<{ conversationId: string; files: File[] } | null>(null);
-  const [filter, setFilter] = useState<"all" | "lost" | "found" | "saved" | "archived">("all");
+  const [filter, setFilter] = useState<
+    "all" | "lost" | "found" | "saved" | "archived" | "hidden" | "blocked"
+  >("all");
   const [pageError, setPageError] = useState("");
   const [conversationError, setConversationError] = useState("");
   const [conversationNotice, setConversationNotice] = useState("");
@@ -93,7 +99,8 @@ export default function MessagesPage() {
   const selectedConversationId = selectedConversation?.id;
   const visibleConversations = useMemo(
     () => conversations.filter((conversation) => {
-      if (conversation.is_deleted) return false;
+      if (filter === "hidden") return conversation.is_deleted;
+      if (conversation.is_deleted || filter === "blocked") return false;
       if (filter === "archived") return conversation.is_archived;
       if (conversation.is_archived) return false;
       if (filter === "lost") return conversation.item?.type === "lost";
@@ -116,7 +123,12 @@ export default function MessagesPage() {
   const loadConversations = useCallback(async () => {
     if (!user) return;
     try {
-      setConversations(await getConversations(user.id));
+      const [nextConversations, nextBlockedUsers] = await Promise.all([
+        getConversations(user.id),
+        getBlockedChatUsers(user.id),
+      ]);
+      setConversations(nextConversations);
+      setBlockedUsers(nextBlockedUsers);
     } catch (loadError) {
       setPageError(
         loadError instanceof Error
@@ -329,8 +341,9 @@ export default function MessagesPage() {
     try {
       await setChatConversationState(selectedConversation.id, state);
       await loadConversations();
-      if (state.is_deleted || state.is_archived !== undefined) {
+      if (state.is_deleted !== undefined || state.is_archived !== undefined) {
         router.replace("/messages");
+        if (state.is_deleted === false) setFilter("all");
       }
     } catch (actionError) {
       setConversationError(
@@ -348,6 +361,21 @@ export default function MessagesPage() {
     } catch (blockError) {
       setConversationError(
         blockError instanceof Error ? blockError.message : "Не удалось заблокировать пользователя.",
+      );
+    }
+  }
+
+  async function handleUnblockUser(blockedUserId: string) {
+    if (!user) return;
+    setPageError("");
+    try {
+      await unblockChatUser(user.id, blockedUserId);
+      await loadConversations();
+    } catch (unblockError) {
+      setPageError(
+        unblockError instanceof Error
+          ? unblockError.message
+          : "Не удалось разблокировать пользователя.",
       );
     }
   }
@@ -458,6 +486,8 @@ export default function MessagesPage() {
                     ["lost", "chat.filterLost"],
                     ["found", "chat.filterFound"],
                     ["saved", "chat.saved"],
+                    ["hidden", "chat.hidden"],
+                    ["blocked", "chat.blockedUsers"],
                     ["archived", "chat.filterArchived"],
                   ] as const).map(([value, labelKey]) => (
                     <button
@@ -474,6 +504,43 @@ export default function MessagesPage() {
                 <div className="messages-list" aria-label={t("chat.title")}>
                   {isLoadingConversations ? (
                     <p className="messages-empty">{t("chat.searching")}</p>
+                  ) : filter === "blocked" ? (
+                    blockedUsers.length ? (
+                      <div className="messages-blocked-users">
+                        {blockedUsers.map((blockedUser) => (
+                          <div className="messages-blocked-user" key={blockedUser.id}>
+                            <span className="messages-avatar">
+                              {blockedUser.avatar_url ? (
+                                <span
+                                  role="img"
+                                  aria-label={getDisplayName(blockedUser)}
+                                  style={{ backgroundImage: `url("${blockedUser.avatar_url}")` }}
+                                />
+                              ) : (
+                                getDisplayName(blockedUser).slice(0, 1).toUpperCase()
+                              )}
+                            </span>
+                            <Link
+                              className="messages-blocked-user-profile"
+                              href={`/u/${encodeURIComponent(blockedUser.username)}`}
+                            >
+                              <strong>{getDisplayName(blockedUser)}</strong>
+                              <small>@{blockedUser.username}</small>
+                            </Link>
+                            <Button
+                              onClick={() => void handleUnblockUser(blockedUser.id)}
+                              size="small"
+                              type="button"
+                              variant="outlined"
+                            >
+                              {t("chat.unblock")}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="messages-empty">{t("chat.blockedEmpty")}</p>
+                    )
                   ) : visibleConversations.length ? (
                     <>
                       {unreadConversations.length > 0 && (
@@ -490,7 +557,9 @@ export default function MessagesPage() {
                       )}
                     </>
                   ) : (
-                    <p className="messages-empty">{t("chat.empty")}</p>
+                    <p className="messages-empty">
+                      {filter === "hidden" ? t("chat.hiddenEmpty") : t("chat.empty")}
+                    </p>
                   )}
                 </div>
               </aside>
@@ -540,12 +609,14 @@ export default function MessagesPage() {
                           {selectedConversation.is_archived ? t("chat.unarchive") : t("chat.archive")}
                         </Button>
                         <Button
-                          onClick={() => void updateSelectedConversationState({ is_deleted: true })}
+                          onClick={() => void updateSelectedConversationState({
+                            is_deleted: !selectedConversation.is_deleted,
+                          })}
                           size="small"
                           type="button"
                           variant="outlined"
                         >
-                          {t("chat.delete")}
+                          {selectedConversation.is_deleted ? t("chat.restoreHidden") : t("chat.delete")}
                         </Button>
                         <Button onClick={() => void handleReportConversation()} size="small" type="button" variant="outlined">
                           {t("chat.report")}

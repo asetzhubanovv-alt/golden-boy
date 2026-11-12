@@ -9,6 +9,8 @@ export type ChatProfile = {
   avatar_url: string | null;
 };
 
+export type ChatBlockedUser = ChatProfile;
+
 export type ChatListingPreview = {
   id: string;
   user_id: string;
@@ -196,6 +198,41 @@ export async function getConversations(userId: string): Promise<ChatConversation
   });
 }
 
+export async function getBlockedChatUsers(userId: string): Promise<ChatBlockedUser[]> {
+  const supabase = getSupabaseClient();
+  const { data: blocks, error: blocksError } = await supabase
+    .from("chat_user_blocks")
+    .select("blocked_id,created_at")
+    .eq("blocker_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (blocksError) {
+    throw new Error(`Не удалось загрузить заблокированных пользователей: ${blocksError.message}`);
+  }
+  const blockedIds = (blocks ?? []).map((block) => block.blocked_id);
+  if (!blockedIds.length) return [];
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id,username,full_name,avatar_url")
+    .in("id", blockedIds);
+
+  if (profilesError) {
+    throw new Error(`Не удалось загрузить профили заблокированных пользователей: ${profilesError.message}`);
+  }
+
+  const profilesById = new Map(
+    ((profiles ?? []) as ChatBlockedUser[]).map((profile) => [profile.id, profile]),
+  );
+  return blockedIds.map((blockedId) => {
+    const profile = profilesById.get(blockedId);
+    if (!profile) {
+      throw new Error("Не удалось найти профиль заблокированного пользователя.");
+    }
+    return profile;
+  });
+}
+
 export async function getUnreadChatCount(): Promise<number> {
   const { data, error } = await getSupabaseClient().rpc("get_unread_chat_counts");
   if (error) {
@@ -379,6 +416,15 @@ export async function blockChatUser(userId: string, blockedId: string): Promise<
     .from("chat_user_blocks")
     .insert({ blocker_id: userId, blocked_id: blockedId });
   if (error) throw new Error(`Не удалось заблокировать пользователя: ${error.message}`);
+}
+
+export async function unblockChatUser(userId: string, blockedId: string): Promise<void> {
+  const { error } = await getSupabaseClient()
+    .from("chat_user_blocks")
+    .delete()
+    .eq("blocker_id", userId)
+    .eq("blocked_id", blockedId);
+  if (error) throw new Error(`Не удалось разблокировать пользователя: ${error.message}`);
 }
 
 export async function reportChat(
