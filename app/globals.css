@@ -1718,6 +1718,76 @@ html[data-theme="dark"] {
   background-size: cover;
 }
 
+.profile-avatar-upload {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--line));
+  border-left: 4px solid var(--primary);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 5px 16px rgb(28 41 39 / 5%);
+}
+
+.profile-avatar-upload .MuiButton-root {
+  display: inline-flex;
+  min-height: 42px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--line));
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-size: 12px;
+  font-weight: 650;
+  text-transform: none;
+}
+
+.profile-avatar-upload .MuiButton-root:hover {
+  border-color: var(--primary-dark);
+  background: color-mix(in srgb, var(--primary-soft) 72%, var(--primary));
+}
+
+.profile-avatar-upload-button > span {
+  display: grid;
+  width: 19px;
+  height: 19px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.profile-avatar-upload .MuiButton-root:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+.profile-avatar-upload-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.profile-avatar-upload-copy strong {
+  overflow-wrap: anywhere;
+  color: var(--foreground);
+  font-size: 12px;
+}
+
+.profile-avatar-upload-copy span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .profile-edit-card input:not([type="file"]),
 .profile-edit-card textarea,
 .admin-section-heading input {
@@ -5785,6 +5855,7 @@ html[data-theme="dark"] .profile-completion progress {
 
 .messages-layout {
   display: grid;
+  height: min(78vh, 820px);
   min-height: 580px;
   grid-template-columns: minmax(250px, 340px) minmax(0, 1fr);
   overflow: hidden;
@@ -5942,9 +6013,11 @@ html[data-theme="dark"] .profile-completion progress {
 
 .messages-conversation {
   display: flex;
+  height: 100%;
   min-width: 0;
-  min-height: 580px;
+  min-height: 0;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .messages-conversation-top {
@@ -6035,11 +6108,12 @@ html[data-theme="dark"] .profile-completion progress {
 
 .messages-history {
   display: flex;
-  min-height: 360px;
+  min-height: 0;
   flex: 1;
   flex-direction: column;
   gap: 10px;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   padding: 20px;
 }
 
@@ -6166,7 +6240,9 @@ html[data-theme="dark"] .header-messages-link {
   }
 
   .messages-layout {
+    height: auto;
     grid-template-columns: 1fr;
+    min-height: 0;
   }
 
   .messages-sidebar {
@@ -6187,11 +6263,12 @@ html[data-theme="dark"] .header-messages-link {
   }
 
   .messages-conversation {
-    min-height: 480px;
+    height: min(78vh, 740px);
+    min-height: 420px;
   }
 
   .messages-history {
-    min-height: 290px;
+    min-height: 0;
   }
 }
 

@@ -80,7 +80,7 @@ export default function MessagesPage() {
   const [loadedMessagesFor, setLoadedMessagesFor] = useState<string | null>(null);
   const processedStart = useRef("");
   const attachmentInput = useRef<HTMLInputElement>(null);
-  const messagesEnd = useRef<HTMLDivElement>(null);
+  const messagesHistory = useRef<HTMLDivElement>(null);
 
   const conversationId = searchParams.get("conversation");
   const selectedFiles = fileDraft?.conversationId === conversationId ? fileDraft.files : [];
@@ -256,7 +256,8 @@ export default function MessagesPage() {
   ]);
 
   useEffect(() => {
-    messagesEnd.current?.scrollIntoView({ behavior: "smooth" });
+    const history = messagesHistory.current;
+    history?.scrollTo({ top: history.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
@@ -665,7 +666,7 @@ export default function MessagesPage() {
                       </Alert>
                     )}
                     {conversationNotice && <Alert severity="success">{conversationNotice}</Alert>}
-                    <div className="messages-history" aria-live="polite">
+                    <div className="messages-history" aria-live="polite" ref={messagesHistory}>
                       {isLoadingMessages ? (
                         <p className="messages-empty">{t("chat.searching")}</p>
                       ) : messages.length ? (
@@ -722,7 +723,6 @@ export default function MessagesPage() {
                       ) : (
                         <p className="messages-empty">{t("chat.noMessages")}</p>
                       )}
-                      <div ref={messagesEnd} />
                     </div>
                     <form className="messages-compose" onSubmit={handleSend}>
                       <input
@@ -758,6 +758,16 @@ export default function MessagesPage() {
                       <textarea
                         aria-label={t("chat.messagePlaceholder")}
                         maxLength={4000}
+                        onKeyDown={(event) => {
+                          if (
+                            event.key === "Enter"
+                            && !event.shiftKey
+                            && !event.nativeEvent.isComposing
+                          ) {
+                            event.preventDefault();
+                            event.currentTarget.form?.requestSubmit();
+                          }
+                        }}
                         onChange={(event) => setDraft(event.target.value)}
                         placeholder={t("chat.messagePlaceholder")}
                         rows={2}

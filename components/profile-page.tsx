@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
@@ -43,6 +43,7 @@ export default function ProfilePage() {
   const [faculty, setFaculty] = useState("");
   const [course, setCourse] = useState("");
   const [avatarSelection, setAvatarSelection] = useState<{ file: File; previewUrl: string } | null>(null);
+  const avatarFileInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
@@ -426,14 +427,36 @@ export default function ProfilePage() {
                               </Button>
                             </div>
                           </div>
-                          <label className="form-group">
+                          <div className="form-group">
                             <span className="form-label">Фото профиля</span>
-                            <input
-                              accept="image/jpeg,image/png,image/webp"
-                              onChange={onAvatarChange}
-                              type="file"
-                            />
-                          </label>
+                            <div className="profile-avatar-upload">
+                              <input
+                                accept="image/jpeg,image/png,image/webp"
+                                aria-label="Фото профиля"
+                                className="profile-avatar-input"
+                                onChange={onAvatarChange}
+                                ref={avatarFileInput}
+                                type="file"
+                                hidden
+                              />
+                              <Button
+                                className="profile-avatar-upload-button"
+                                onClick={() => avatarFileInput.current?.click()}
+                                type="button"
+                                variant="outlined"
+                              >
+                                <span aria-hidden="true">↑</span>
+                                Выбрать фото
+                              </Button>
+                              <div aria-live="polite" className="profile-avatar-upload-copy">
+                                <strong>
+                                  {avatarSelection?.file.name
+                                    ?? (profile.avatar_url ? "Текущее фото" : "Фото не выбрано")}
+                                </strong>
+                                <span>JPG, PNG или WebP · до 5 МБ</span>
+                              </div>
+                            </div>
+                          </div>
                           <label className="form-group">
                             <span className="form-label">Никнейм <span>*</span></span>
                             <input
