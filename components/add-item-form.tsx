@@ -78,7 +78,6 @@ export default function AddItemForm({
   const [details, setDetails] = useState("");
   const [place, setPlace] = useState("");
   const [date, setDate] = useState("");
-  const [price, setPrice] = useState("");
   const [imageDataUrls, setImageDataUrls] = useState<string[]>([]);
   const [imageNames, setImageNames] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -140,17 +139,6 @@ export default function AddItemForm({
       setError(t("form.error.date"));
       return;
     }
-    const priceValue = price.trim() ? Number(price) : null;
-    if (
-      priceValue !== null &&
-      (!Number.isFinite(priceValue) ||
-        priceValue < 0 ||
-        priceValue > 9_999_999_999.99 ||
-        Number(priceValue.toFixed(2)) !== priceValue)
-    ) {
-      setError("Укажите цену неотрицательным числом, максимум два знака после запятой.");
-      return;
-    }
 
     setIsSaving(true);
     const { art, symbol } = getItemArt(category);
@@ -171,7 +159,6 @@ export default function AddItemForm({
         art,
         symbol,
         details: details.trim(),
-        price: priceValue,
         ownerId: user.id,
         ...(imageDataUrls.length ? { imageDataUrls } : {}),
       });
@@ -340,21 +327,6 @@ export default function AddItemForm({
               <span className="field-hint">
                 {t("form.privacyHint")}
               </span>
-            </label>
-
-            <label className="form-group">
-              <span className="form-label">{t("form.price")}</span>
-              <input
-                inputMode="decimal"
-                max={9_999_999_999.99}
-                min={0}
-                onChange={(event) => setPrice(event.target.value)}
-                placeholder="0"
-                step="0.01"
-                type="number"
-                value={price}
-              />
-              <span className="field-hint">{t("form.priceHint")}</span>
             </label>
 
             <div className="form-two-columns">
