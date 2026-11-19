@@ -165,7 +165,7 @@ const translations: Record<Language, TranslationSet> = {
       feed: "Лента",
       about: "Біз туралы",
       login: "Кіру",
-      publish: "Елдеді жариялау",
+      publish: "Хабарландыру жариялау",
     },
     hero: {
       searchPlaceholder: "Не іздеп жатырмыз? Мысалы, құлаққап",
