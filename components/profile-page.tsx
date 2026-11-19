@@ -22,7 +22,6 @@ import { getLostItemProgress, getSimilarFoundItems } from "@/lib/item-matching";
 import { useFavoriteItems } from "@/lib/use-favorite-items";
 import RewardAmountField from "@/components/reward-amount-field";
 import { useLanguage } from "@/components/language-provider";
-import ItemSightingMap from "@/components/item-sighting-map";
 import { getMyItemSightings, type ItemSighting } from "@/lib/sightings";
 
 type ProfileTab = "listings" | "favorites" | "sightings" | "settings";
@@ -471,80 +470,74 @@ export default function ProfilePage() {
                         {isSightingsLoading ? (
                           <p>{t("profile.sightings.loading")}</p>
                         ) : mySightings.length ? (
-                          <>
-                            <ItemSightingMap
-                              mode="sightings"
-                              sightings={mySightings}
-                            />
-                            <div className="item-sighting-list profile-sighting-list">
-                              {mySightings.map((sighting) => (
-                                <article
-                                  className="item-sighting-card"
-                                  key={sighting.id}
-                                >
-                                  <div className="item-sighting-byline">
-                                    <strong>
-                                      <span>
-                                        {t("profile.sightings.markedListing")}:{" "}
-                                      </span>
-                                      <Link
-                                        href={`/item/${encodeURIComponent(sighting.itemId)}?sighting=${encodeURIComponent(sighting.id)}#item-sightings`}
-                                      >
-                                        {sighting.itemTitle ||
-                                          t("profile.sightings.untitledItem")}
-                                      </Link>
-                                    </strong>
-                                    <time dateTime={sighting.observedAt}>
-                                      {new Intl.DateTimeFormat(locale, {
-                                        day: "numeric",
-                                        month: "long",
-                                        year: "numeric",
-                                      }).format(
-                                        new Date(`${sighting.observedAt}T12:00:00`),
-                                      )}
-                                    </time>
-                                  </div>
-                                  {sighting.itemType && (
-                                    <small>
-                                      {t(
-                                        sighting.itemType === "lost"
-                                          ? "detail.lost"
-                                          : "detail.found",
-                                      )}
-                                    </small>
-                                  )}
-                                  {sighting.itemPlace && (
-                                    <p>
-                                      <strong>
-                                        {t("profile.sightings.listingLocation")}:{" "}
-                                      </strong>
-                                      {sighting.itemPlace}
-                                    </p>
-                                  )}
+                          <div className="item-sighting-list profile-sighting-list">
+                            {mySightings.map((sighting) => (
+                              <article
+                                className="item-sighting-card"
+                                key={sighting.id}
+                              >
+                                <div className="item-sighting-byline">
+                                  <strong>
+                                    <span>
+                                      {t("profile.sightings.markedListing")}:{" "}
+                                    </span>
+                                    <Link
+                                      href={`/item/${encodeURIComponent(sighting.itemId)}?sighting=${encodeURIComponent(sighting.id)}#item-sightings`}
+                                    >
+                                      {sighting.itemTitle ||
+                                        t("profile.sightings.untitledItem")}
+                                    </Link>
+                                  </strong>
+                                  <time dateTime={sighting.observedAt}>
+                                    {new Intl.DateTimeFormat(locale, {
+                                      day: "numeric",
+                                      month: "long",
+                                      year: "numeric",
+                                    }).format(
+                                      new Date(`${sighting.observedAt}T12:00:00`),
+                                    )}
+                                  </time>
+                                </div>
+                                {sighting.itemType && (
+                                  <small>
+                                    {t(
+                                      sighting.itemType === "lost"
+                                        ? "detail.lost"
+                                        : "detail.found",
+                                    )}
+                                  </small>
+                                )}
+                                {sighting.itemPlace && (
                                   <p>
                                     <strong>
-                                      {t("profile.sightings.observedLocation")}:{" "}
+                                      {t("profile.sightings.listingLocation")}:{" "}
                                     </strong>
-                                    {sighting.address ||
-                                      `${sighting.latitude.toFixed(5)}, ${sighting.longitude.toFixed(5)}`}
+                                    {sighting.itemPlace}
                                   </p>
-                                  {sighting.comment && (
-                                    <p>
-                                      <strong>{t("profile.sightings.commentLabel")}: </strong>
-                                      {sighting.comment}
-                                    </p>
-                                  )}
-                                  <small className="profile-sighting-saved-at">
-                                    {t("profile.sightings.savedAt")}{" "}
-                                    {new Intl.DateTimeFormat(locale, {
-                                      dateStyle: "medium",
-                                      timeStyle: "short",
-                                    }).format(new Date(sighting.createdAt))}
-                                  </small>
-                                </article>
-                              ))}
-                            </div>
-                          </>
+                                )}
+                                <p>
+                                  <strong>
+                                    {t("profile.sightings.observedLocation")}:{" "}
+                                  </strong>
+                                  {sighting.address ||
+                                    `${sighting.latitude.toFixed(5)}, ${sighting.longitude.toFixed(5)}`}
+                                </p>
+                                {sighting.comment && (
+                                  <p>
+                                    <strong>{t("profile.sightings.commentLabel")}: </strong>
+                                    {sighting.comment}
+                                  </p>
+                                )}
+                                <small className="profile-sighting-saved-at">
+                                  {t("profile.sightings.savedAt")}{" "}
+                                  {new Intl.DateTimeFormat(locale, {
+                                    dateStyle: "medium",
+                                    timeStyle: "short",
+                                  }).format(new Date(sighting.createdAt))}
+                                </small>
+                              </article>
+                            ))}
+                          </div>
                         ) : (
                           <div className="account-empty">
                             <span aria-hidden="true">⌖</span>
