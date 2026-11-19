@@ -14,7 +14,7 @@ import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
 import BackLink from "@/components/back-link";
 import { useLanguage } from "@/components/language-provider";
-import GoogleMapLocation from "@/components/google-map-location";
+import MapLocationPicker from "@/components/map-location-picker";
 import { categoryTranslationKey, type Language } from "@/lib/messages";
 import {
   DEMO_ITEMS,
@@ -37,7 +37,7 @@ import { OPEN_NOTIFICATIONS_EVENT } from "@/lib/use-item-notifications";
 import { useItemNotifications } from "@/lib/use-item-notifications";
 import OwnershipVerification from "@/components/ownership-verification";
 import RewardAmountField from "@/components/reward-amount-field";
-import GoogleMap from "@/components/google-map";
+import ItemSightingMap from "@/components/item-sighting-map";
 import { createOrGetConversation } from "@/lib/chat";
 import {
   createItemSighting,
@@ -103,10 +103,11 @@ export default function ItemDetail({ id }: { id: string }) {
   const [sightingError, setSightingError] = useState("");
   const [sightingNotice, setSightingNotice] = useState("");
   const [isSightingDialogOpen, setIsSightingDialogOpen] = useState(false);
-  const [selectedSightingLocation, setSelectedSightingLocation] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
+  const [sightingLocation, setSightingLocation] = useState<ItemLocation>({
+    address: "",
+    latitude: null,
+    longitude: null,
+  });
   const [sightingDate, setSightingDate] = useState(getLocalDateValue);
   const [sightingComment, setSightingComment] = useState("");
   const [isSubmittingSighting, setIsSubmittingSighting] = useState(false);
@@ -204,7 +205,7 @@ export default function ItemDetail({ id }: { id: string }) {
     }
     setSightingError("");
     setSightingNotice("");
-    setSelectedSightingLocation(null);
+    setSightingLocation({ address: "", latitude: null, longitude: null });
     setSightingDate(getLocalDateValue());
     setSightingComment("");
     setIsSightingDialogOpen(true);
@@ -218,7 +219,8 @@ export default function ItemDetail({ id }: { id: string }) {
       setSightingError(t("sighting.loginPrompt"));
       return;
     }
-    if (!selectedSightingLocation) {
+    const { address, latitude, longitude } = sightingLocation;
+    if (latitude === null || longitude === null) {
       setSightingError(t("sighting.pickLocation"));
       return;
     }
@@ -228,7 +230,9 @@ export default function ItemDetail({ id }: { id: string }) {
       const sighting = await createItemSighting({
         id: crypto.randomUUID(),
         itemId: id,
-        ...selectedSightingLocation,
+        address,
+        latitude,
+        longitude,
         observedAt: sightingDate,
         comment: sightingComment,
       });
@@ -635,7 +639,7 @@ export default function ItemDetail({ id }: { id: string }) {
                     <p className="item-sightings-empty">{t("sighting.empty")}</p>
                   ) : (
                     <>
-                      <GoogleMap
+                      <ItemSightingMap
                         highlightSightingId={requestedSightingId}
                         mode="sightings"
                         sightings={visibleSightings}
@@ -661,6 +665,11 @@ export default function ItemDetail({ id }: { id: string }) {
                                 }).format(new Date(`${sighting.observedAt}T12:00:00`))}
                               </time>
                             </div>
+                            {sighting.address && (
+                              <p>
+                                <strong>{t("sighting.address")}:</strong> {sighting.address}
+                              </p>
+                            )}
                             {sighting.comment && <p>{sighting.comment}</p>}
                             <small>
                               {sighting.latitude.toFixed(5)}, {sighting.longitude.toFixed(5)}
@@ -703,16 +712,18 @@ export default function ItemDetail({ id }: { id: string }) {
                 <p className="sighting-dialog-help">{t("sighting.help")}</p>
                 {sightingError && <Alert severity="error">{sightingError}</Alert>}
                 <p className="sighting-map-instructions">{t("sighting.pickLocation")}</p>
-                <GoogleMap
-                  mode="select"
-                  onLocationSelect={setSelectedSightingLocation}
-                  selectedLocation={selectedSightingLocation}
+                <MapLocationPicker
+                  compact
+                  language={language}
+                  onChange={setSightingLocation}
+                  value={sightingLocation}
                 />
-                {selectedSightingLocation && (
-                  <p aria-live="polite" className="sighting-selected-location">
-                    {selectedSightingLocation.latitude.toFixed(5)}, {selectedSightingLocation.longitude.toFixed(5)}
-                  </p>
-                )}
+                {sightingLocation.latitude !== null &&
+                  sightingLocation.longitude !== null && (
+                    <p aria-live="polite" className="sighting-selected-location">
+                      {sightingLocation.latitude.toFixed(5)}, {sightingLocation.longitude.toFixed(5)}
+                    </p>
+                  )}
                 <form
                   className="item-sighting-form"
                   id="item-sighting-form"
@@ -749,7 +760,11 @@ export default function ItemDetail({ id }: { id: string }) {
                   {t("sighting.cancel")}
                 </Button>
                 <Button
-                  disabled={isSubmittingSighting || !selectedSightingLocation}
+                  disabled={
+                    isSubmittingSighting ||
+                    sightingLocation.latitude === null ||
+                    sightingLocation.longitude === null
+                  }
                   form="item-sighting-form"
                   type="submit"
                   variant="contained"
@@ -853,7 +868,7 @@ export default function ItemDetail({ id }: { id: string }) {
                       <label className="form-group"><span className="form-label">Название</span><input maxLength={80} onChange={(event) => setEditTitle(event.target.value)} required value={editTitle} /></label>
                       <label className="form-group"><span className="form-label">Тип объявления</span><select onChange={(event) => { if (event.target.value === "lost" || event.target.value === "found") { setEditType(event.target.value); if (event.target.value === "found") { setEditRewardEnabled(false); setEditRewardAmount(""); } } }} value={editType}><option value="lost">Потерял</option><option value="found">Нашёл</option></select></label>
                       <label className="form-group"><span className="form-label">Категория</span><select onChange={(event) => setEditCategory(event.target.value)} required value={editCategory}>{ITEM_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
-                      <div className="form-group"><span className="form-label">Местоположение</span><GoogleMapLocation compact language={language} onChange={setEditLocation} value={editLocation} /></div>
+                      <div className="form-group"><span className="form-label">Местоположение</span><MapLocationPicker compact language={language} onChange={setEditLocation} value={editLocation} /></div>
                       <label className="form-group"><span className="form-label">Дата</span><input onChange={(event) => setEditDate(event.target.value)} required type="date" value={editDate} /></label>
                       <label className="form-group"><span className="form-label">{t("form.price")}</span><input max={9_999_999_999.99} min={0} onChange={(event) => setEditPrice(event.target.value)} step="0.01" type="number" value={editPrice} /></label>
                       <RewardAmountField
@@ -946,7 +961,7 @@ export default function ItemDetail({ id }: { id: string }) {
             {language === "en" ? "Location" : language === "kk" ? "Орналасқан жері" : "Местоположение"}
           </h2>
           {item.latitude != null && item.longitude != null ? (
-            <GoogleMapLocation
+            <MapLocationPicker
               language={language}
               readOnly
               value={{

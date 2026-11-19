@@ -15,7 +15,7 @@ import {
 } from "@/lib/items";
 import { useStoredItems, useTodayDate } from "@/lib/use-stored-items";
 import { useLanguage } from "@/components/language-provider";
-import GoogleMapLocation from "@/components/google-map-location";
+import MapLocationPicker from "@/components/map-location-picker";
 
 type TimeFilter = "all" | "today" | "week";
 type StatusFilter = "all" | "searching" | "found" | "returned";
@@ -896,7 +896,7 @@ export default function Home() {
                 </label>
                 <fieldset className="location-filter">
                   <legend>{t.filters.locationLabel}</legend>
-                  <GoogleMapLocation
+                  <MapLocationPicker
                     compact
                     language={language}
                     onChange={(location) => {

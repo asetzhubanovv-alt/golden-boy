@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
 import BackLink from "@/components/back-link";
-import GoogleMapLocation from "@/components/google-map-location";
+import MapLocationPicker from "@/components/map-location-picker";
 import { useLanguage } from "@/components/language-provider";
 import {
   getDaysAgo,
@@ -372,7 +372,7 @@ export default function AddItemForm({
               <span className="form-label">
                 {t("form.location")} <span>*</span>
               </span>
-              <GoogleMapLocation
+              <MapLocationPicker
                 language={language}
                 onChange={setLocation}
                 value={location}

@@ -6,6 +6,7 @@ export type ItemSighting = {
   id: string;
   itemId: string;
   userId: string;
+  address: string;
   latitude: number;
   longitude: number;
   observedAt: string;
@@ -19,6 +20,7 @@ type ItemSightingRow = {
   id: string;
   item_id: string;
   user_id: string;
+  address: string;
   latitude: number | string;
   longitude: number | string;
   observed_at: string;
@@ -28,7 +30,7 @@ type ItemSightingRow = {
 };
 
 const sightingSelection =
-  "id,item_id,user_id,latitude,longitude,observed_at,comment,created_at,profiles!item_sightings_user_id_fkey(username,full_name)";
+  "id,item_id,user_id,address,latitude,longitude,observed_at,comment,created_at,profiles!item_sightings_user_id_fkey(username,full_name)";
 
 function fromSightingRow(row: ItemSightingRow): ItemSighting {
   const latitude = Number(row.latitude);
@@ -47,6 +49,7 @@ function fromSightingRow(row: ItemSightingRow): ItemSighting {
     id: row.id,
     itemId: row.item_id,
     userId: row.user_id,
+    address: row.address,
     latitude,
     longitude,
     observedAt: row.observed_at,
@@ -72,6 +75,7 @@ export async function getItemSightings(itemId: string): Promise<ItemSighting[]> 
 export async function createItemSighting(input: {
   id: string;
   itemId: string;
+  address: string;
   latitude: number;
   longitude: number;
   observedAt: string;
@@ -101,6 +105,10 @@ export async function createItemSighting(input: {
   if (comment.length > 1000) {
     throw new Error("Комментарий не должен быть длиннее 1000 символов.");
   }
+  const address = input.address.trim();
+  if (address.length > 120) {
+    throw new Error("Адрес не должен содержать более 120 символов.");
+  }
 
   const supabase = getSupabaseClient();
   const { data: userData, error: authError } = await supabase.auth.getUser();
@@ -113,6 +121,7 @@ export async function createItemSighting(input: {
       id: input.id,
       item_id: input.itemId,
       user_id: userData.user.id,
+      address,
       latitude: input.latitude,
       longitude: input.longitude,
       observed_at: input.observedAt,

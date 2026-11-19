@@ -427,12 +427,30 @@ create table if not exists public.item_sightings (
   id uuid primary key default gen_random_uuid(),
   item_id uuid not null references public.items(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
+  address text not null default '',
   latitude double precision not null check (latitude between -90 and 90),
   longitude double precision not null check (longitude between -180 and 180),
   observed_at date not null,
   comment text not null default '' check (char_length(comment) <= 1000),
   created_at timestamptz not null default now()
 );
+
+alter table public.item_sightings
+  add column if not exists address text not null default '';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.item_sightings'::regclass
+      and conname = 'item_sightings_address_length_check'
+  ) then
+    alter table public.item_sightings
+      add constraint item_sightings_address_length_check
+      check (char_length(address) <= 120);
+  end if;
+end
+$$;
 
 create index if not exists item_sightings_item_observed_at_idx
   on public.item_sightings (item_id, observed_at desc, created_at desc);
