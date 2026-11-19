@@ -2,6 +2,11 @@ import { getSupabaseClient } from "@/lib/supabase";
 
 export type ItemType = "lost" | "found";
 export type ItemStatus = "searching" | "found" | "returned";
+export type ItemLocation = {
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+};
 
 export type Item = {
   id: string;
@@ -9,6 +14,8 @@ export type Item = {
   category: string;
   type: ItemType;
   place: string;
+  latitude?: number | null;
+  longitude?: number | null;
   date?: string;
   createdAt?: string;
   daysAgo: number;
@@ -139,6 +146,8 @@ type ItemRow = {
   category: string;
   type: ItemType;
   location: string;
+  latitude: number | null;
+  longitude: number | null;
   date: string;
   photos: string[];
   price: number | null;
@@ -166,6 +175,8 @@ function fromItemRow(row: ItemRow): Item {
     category: row.category,
     type: row.type,
     place: row.location,
+    latitude: row.latitude,
+    longitude: row.longitude,
     date: row.date,
     createdAt: row.created_at,
     daysAgo: getDaysAgo(row.date),
@@ -189,7 +200,32 @@ function fromItemRow(row: ItemRow): Item {
 }
 
 const itemSelection =
-  "id,user_id,title,category,type,location,date,photos,price,status,description,created_at,profiles!items_user_profile_fkey(username,full_name,is_verified)";
+  "id,user_id,title,category,type,location,latitude,longitude,date,photos,price,status,description,created_at,profiles!items_user_profile_fkey(username,full_name,is_verified)";
+
+function isValidCoordinates(
+  latitude: number | null | undefined,
+  longitude: number | null | undefined,
+): latitude is number {
+  return (
+    typeof latitude === "number" &&
+    typeof longitude === "number" &&
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180
+  );
+}
+
+function validateCoordinates(
+  latitude: number | null | undefined,
+  longitude: number | null | undefined,
+): void {
+  if (!isValidCoordinates(latitude, longitude)) {
+    throw new Error("Выберите корректное местоположение на карте.");
+  }
+}
 
 function normalizePrice(price: number | null | undefined): number | null {
   if (price === null || price === undefined) return null;
@@ -220,6 +256,7 @@ export function getAllItems(storedItems: Item[] = []): Item[] {
 }
 
 export async function saveItem(item: Item): Promise<void> {
+  validateCoordinates(item.latitude, item.longitude);
   const supabase = getSupabaseClient();
   const photos: string[] = [];
   const uploadedPaths: string[] = [];
@@ -250,6 +287,8 @@ export async function saveItem(item: Item): Promise<void> {
     category: item.category,
     type: item.type,
     location: item.place,
+    latitude: item.latitude,
+    longitude: item.longitude,
     date: item.date ?? new Date().toISOString().slice(0, 10),
     status: item.status === "returned" ? "returned" : "active",
     description: item.details,
@@ -278,7 +317,7 @@ export async function saveItem(item: Item): Promise<void> {
 export async function updateStoredItem(
   id: string,
   ownerId: string,
-  updates: Partial<Pick<Item, "status" | "title" | "category" | "type" | "place" | "date" | "details" | "price">>,
+  updates: Partial<Pick<Item, "status" | "title" | "category" | "type" | "place" | "latitude" | "longitude" | "date" | "details" | "price">>,
 ): Promise<Item> {
   const databaseUpdates: Record<string, string | number | null> = {};
   if (updates.status) {
@@ -288,6 +327,17 @@ export async function updateStoredItem(
   if (updates.category !== undefined) databaseUpdates.category = updates.category;
   if (updates.type !== undefined) databaseUpdates.type = updates.type;
   if (updates.place !== undefined) databaseUpdates.location = updates.place.trim();
+  if (updates.latitude !== undefined || updates.longitude !== undefined) {
+    if (
+      typeof updates.latitude !== "number" ||
+      typeof updates.longitude !== "number"
+    ) {
+      throw new Error("Выберите корректное местоположение на карте.");
+    }
+    validateCoordinates(updates.latitude, updates.longitude);
+    databaseUpdates.latitude = updates.latitude;
+    databaseUpdates.longitude = updates.longitude;
+  }
   if (updates.date !== undefined) databaseUpdates.date = updates.date;
   if (updates.details !== undefined) databaseUpdates.description = updates.details.trim();
   if (updates.price !== undefined) databaseUpdates.price = normalizePrice(updates.price);
@@ -388,6 +438,24 @@ export function getDaysAgo(date: string): number {
     today.getDate(),
   );
   return Math.max(0, Math.floor((todayUtc - selected) / 86_400_000));
+}
+
+export function getDistanceInKm(
+  first: { latitude: number; longitude: number },
+  second: { latitude: number; longitude: number },
+): number {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitudeDifference = radians(second.latitude - first.latitude);
+  const longitudeDifference = radians(second.longitude - first.longitude);
+  const firstLatitude = radians(first.latitude);
+  const secondLatitude = radians(second.latitude);
+  const haversine = Math.min(1,
+    Math.sin(latitudeDifference / 2) ** 2 +
+      Math.cos(firstLatitude) *
+        Math.cos(secondLatitude) *
+        Math.sin(longitudeDifference / 2) ** 2,
+  );
+  return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 }
 
 export function isStoredItem(
