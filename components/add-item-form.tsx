@@ -13,12 +13,14 @@ import { useRouter } from "next/navigation";
 import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
 import BackLink from "@/components/back-link";
+import GoogleMapLocation from "@/components/google-map-location";
 import { useLanguage } from "@/components/language-provider";
 import {
   getDaysAgo,
   getItemArt,
   ITEM_CATEGORIES,
   saveItem,
+  type ItemLocation,
   type ItemType,
 } from "@/lib/items";
 import { categoryTranslationKey } from "@/lib/messages";
@@ -66,7 +68,7 @@ export default function AddItemForm({
   searchParams: Promise<{ type?: string | string[] }>;
 }) {
   const { type: requestedType } = use(searchParams);
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const router = useRouter();
   const today = useTodayDate();
   const { user, isReady: isAuthReady, error: authError } = useDemoAuth();
@@ -76,7 +78,11 @@ export default function AddItemForm({
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [details, setDetails] = useState("");
-  const [place, setPlace] = useState("");
+  const [location, setLocation] = useState<ItemLocation>({
+    address: "",
+    latitude: null,
+    longitude: null,
+  });
   const [date, setDate] = useState("");
   const [imageDataUrls, setImageDataUrls] = useState<string[]>([]);
   const [imageNames, setImageNames] = useState<string[]>([]);
@@ -139,6 +145,18 @@ export default function AddItemForm({
       setError(t("form.error.date"));
       return;
     }
+    if (!location.address.trim()) {
+      setError("Выбери место на карте или найди его по адресу.");
+      return;
+    }
+    if (location.address.trim().length > 120) {
+      setError("Адрес должен содержать не более 120 символов.");
+      return;
+    }
+    if (location.latitude === null || location.longitude === null) {
+      setError("Найди адрес через поиск или выбери точку на карте.");
+      return;
+    }
 
     setIsSaving(true);
     const { art, symbol } = getItemArt(category);
@@ -151,7 +169,9 @@ export default function AddItemForm({
         title: title.trim(),
         category,
         type,
-        place: place.trim(),
+        place: location.address.trim(),
+        latitude: location.latitude,
+        longitude: location.longitude,
         date: selectedDate,
         daysAgo: getDaysAgo(selectedDate),
         time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
@@ -329,20 +349,18 @@ export default function AddItemForm({
               </span>
             </label>
 
-            <div className="form-two-columns">
-              <label className="form-group">
-                <span className="form-label">
-                  {t("form.location")} <span>*</span>
-                </span>
-                <input
-                  maxLength={120}
-                  onChange={(event) => setPlace(event.target.value)}
-                  placeholder={t("form.locationPlaceholder")}
-                  required
-                  value={place}
-                />
-              </label>
+            <div className="form-group">
+              <span className="form-label">
+                {t("form.location")} <span>*</span>
+              </span>
+              <GoogleMapLocation
+                language={language}
+                onChange={setLocation}
+                value={location}
+              />
+            </div>
 
+            <div className="form-two-columns">
               <label className="form-group">
                 <span className="form-label">
                   {t("form.date")} <span>*</span>

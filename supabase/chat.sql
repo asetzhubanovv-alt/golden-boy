@@ -26,6 +26,8 @@ alter table public.conversations
   add column if not exists participant_1_last_read_at timestamptz not null default now(),
   add column if not exists participant_2_last_read_at timestamptz not null default now();
 alter table public.items add column if not exists price numeric(12,2);
+alter table public.items add column if not exists latitude double precision;
+alter table public.items add column if not exists longitude double precision;
 
 do $$
 begin
@@ -36,6 +38,21 @@ begin
   ) then
     alter table public.items add constraint items_price_nonnegative_check
       check (price is null or price >= 0);
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.items'::regclass
+      and conname = 'items_location_coordinates_check'
+  ) then
+    alter table public.items add constraint items_location_coordinates_check
+      check (
+        (latitude is null and longitude is null)
+        or (
+          latitude is not null and longitude is not null
+          and latitude between -90 and 90
+          and longitude between -180 and 180
+        )
+      );
   end if;
 end
 $$;
@@ -125,13 +142,13 @@ grant update (username, full_name, avatar_url, bio, faculty, course, role, is_ve
 
 revoke select on public.items from anon, authenticated;
 revoke select (contact_method) on public.items from anon, authenticated;
-grant select (id, user_id, type, title, description, category, location, date, photos, price, status, created_at, updated_at)
+grant select (id, user_id, type, title, description, category, location, latitude, longitude, date, photos, price, status, created_at, updated_at)
   on public.items to anon, authenticated;
 revoke insert, update on public.items from authenticated;
 revoke insert (contact_method), update (contact_method) on public.items from authenticated;
-grant insert (id, user_id, type, title, description, category, location, date, photos, price, status)
+grant insert (id, user_id, type, title, description, category, location, latitude, longitude, date, photos, price, status)
   on public.items to authenticated;
-grant update (title, description, category, location, date, photos, price, status)
+grant update (title, description, category, location, latitude, longitude, date, photos, price, status)
   on public.items to authenticated;
 grant delete on public.items to authenticated;
 

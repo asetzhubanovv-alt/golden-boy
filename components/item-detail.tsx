@@ -14,6 +14,7 @@ import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
 import BackLink from "@/components/back-link";
 import { useLanguage } from "@/components/language-provider";
+import GoogleMapLocation from "@/components/google-map-location";
 import { categoryTranslationKey, type Language } from "@/lib/messages";
 import {
   DEMO_ITEMS,
@@ -24,6 +25,7 @@ import {
   saveItemReport,
   updateStoredItem,
   type Item,
+  type ItemLocation,
   type ItemStatus,
 } from "@/lib/items";
 import { useStoredItems } from "@/lib/use-stored-items";
@@ -70,7 +72,11 @@ export default function ItemDetail({ id }: { id: string }) {
   const [editTitle, setEditTitle] = useState("");
   const [editCategory, setEditCategory] = useState("");
   const [editType, setEditType] = useState<"lost" | "found">("lost");
-  const [editPlace, setEditPlace] = useState("");
+  const [editLocation, setEditLocation] = useState<ItemLocation>({
+    address: "",
+    latitude: null,
+    longitude: null,
+  });
   const [editDate, setEditDate] = useState("");
   const [editDetails, setEditDetails] = useState("");
   const [editPrice, setEditPrice] = useState("");
@@ -117,7 +123,11 @@ export default function ItemDetail({ id }: { id: string }) {
     setEditTitle(item.title);
     setEditCategory(item.category);
     setEditType(item.type);
-    setEditPlace(item.place);
+    setEditLocation({
+      address: item.place,
+      latitude: item.latitude ?? null,
+      longitude: item.longitude ?? null,
+    });
     setEditDate(item.date ?? "");
     setEditDetails(item.details);
     setEditPrice(item.price == null ? "" : String(item.price));
@@ -130,8 +140,16 @@ export default function ItemDetail({ id }: { id: string }) {
     event.preventDefault();
     setActionError("");
 
-    if (!editTitle.trim() || !editCategory || !editPlace.trim() || !editDate || !editDetails.trim()) {
+    if (!editTitle.trim() || !editCategory || !editLocation.address.trim() || !editDate || !editDetails.trim()) {
       setActionError("Заполните все обязательные поля.");
+      return;
+    }
+    if (editLocation.latitude === null || editLocation.longitude === null) {
+      setActionError("Найдите адрес или выберите точку на карте.");
+      return;
+    }
+    if (editLocation.address.trim().length > 120) {
+      setActionError("Адрес должен содержать не более 120 символов.");
       return;
     }
 
@@ -148,7 +166,9 @@ export default function ItemDetail({ id }: { id: string }) {
         title: editTitle,
         category: editCategory,
         type: editType,
-        place: editPlace,
+        place: editLocation.address,
+        latitude: editLocation.latitude,
+        longitude: editLocation.longitude,
         date: editDate,
         details: editDetails,
         price: editPrice.trim() ? Number(editPrice) : null,
@@ -493,7 +513,7 @@ export default function ItemDetail({ id }: { id: string }) {
                       <label className="form-group"><span className="form-label">Название</span><input maxLength={80} onChange={(event) => setEditTitle(event.target.value)} required value={editTitle} /></label>
                       <label className="form-group"><span className="form-label">Тип объявления</span><select onChange={(event) => { if (event.target.value === "lost" || event.target.value === "found") setEditType(event.target.value); }} value={editType}><option value="lost">Потерял</option><option value="found">Нашёл</option></select></label>
                       <label className="form-group"><span className="form-label">Категория</span><select onChange={(event) => setEditCategory(event.target.value)} required value={editCategory}>{ITEM_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
-                      <label className="form-group"><span className="form-label">Место</span><input maxLength={120} onChange={(event) => setEditPlace(event.target.value)} required value={editPlace} /></label>
+                      <div className="form-group"><span className="form-label">Местоположение</span><GoogleMapLocation compact language={language} onChange={setEditLocation} value={editLocation} /></div>
                       <label className="form-group"><span className="form-label">Дата</span><input onChange={(event) => setEditDate(event.target.value)} required type="date" value={editDate} /></label>
                       <label className="form-group"><span className="form-label">{t("form.price")}</span><input max={9_999_999_999.99} min={0} onChange={(event) => setEditPrice(event.target.value)} step="0.01" type="number" value={editPrice} /></label>
                       <label className="form-group"><span className="form-label">Описание</span><textarea maxLength={1500} onChange={(event) => setEditDetails(event.target.value)} rows={4} value={editDetails} /></label>
@@ -570,6 +590,32 @@ export default function ItemDetail({ id }: { id: string }) {
             )}
           </article>
         </div>
+
+        <section aria-labelledby="item-location-title" className="item-location-section">
+          <h2 id="item-location-title">
+            {language === "en" ? "Location" : language === "kk" ? "Орналасқан жері" : "Местоположение"}
+          </h2>
+          {item.latitude != null && item.longitude != null ? (
+            <GoogleMapLocation
+              language={language}
+              readOnly
+              value={{
+                address: item.place,
+                latitude: item.latitude,
+                longitude: item.longitude,
+              }}
+            />
+          ) : (
+            <p className="item-location-unavailable">
+              {item.place}.{" "}
+              {language === "en"
+                ? "Exact coordinates were not saved for this listing."
+                : language === "kk"
+                  ? "Бұл хабарландыру үшін нақты координаттар сақталмаған."
+                  : "Точные координаты для этого объявления не сохранены."}
+            </p>
+          )}
+        </section>
 
         <div className="detail-back-row">
           <Link href="/">← {t("detail.backAll")}</Link>
