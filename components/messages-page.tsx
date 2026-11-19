@@ -462,7 +462,7 @@ export default function MessagesPage() {
         ) : (
           <>
             {pageError && <Alert className="messages-alert" severity="error">{pageError}</Alert>}
-            <div className="messages-layout">
+            <div className={`messages-layout${selectedConversation ? " has-selected-conversation" : ""}`}>
               <aside className="messages-sidebar">
                 <form className="messages-search" onSubmit={handleSearch}>
                   <label htmlFor="chat-username">{t("chat.searchPlaceholder")}</label>
@@ -569,6 +569,12 @@ export default function MessagesPage() {
                 {selectedConversation ? (
                   <>
                     <div className="messages-conversation-top">
+                      <Link className="messages-mobile-back" href="/messages">
+                        <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+                          <path d="m15 18-6-6 6-6M9 12h12" />
+                        </svg>
+                        {t("chat.backToList")}
+                      </Link>
                       <header className="messages-conversation-header">
                         <span className="messages-avatar">
                           {selectedConversation.other_profile.avatar_url ? (

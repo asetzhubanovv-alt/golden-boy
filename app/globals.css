@@ -283,7 +283,7 @@ a {
     bottom: 0;
     left: 0;
     display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     padding: 9px max(8px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
     border-top: 1px solid rgba(60, 60, 67, 0.12);
     background: rgba(250, 250, 252, 0.88);
@@ -297,13 +297,13 @@ a {
     min-width: 0;
     justify-items: center;
     gap: 2px;
+    min-height: 44px;
     color: #687770;
     font-size: 20px;
   }
 
-  .mobile-tab-bar a[aria-current="page"],
-  .mobile-tab-bar a[href="/"] {
-    color: #0b766f;
+  .mobile-tab-bar .mobile-notifications-button {
+    min-height: 44px;
   }
 
   .mobile-tab-bar small {
@@ -6648,6 +6648,10 @@ html[data-theme="dark"] .profile-completion progress {
   font-size: 11px;
 }
 
+.messages-mobile-back {
+  display: none;
+}
+
 .messages-item-card {
   display: flex;
   max-width: 460px;
@@ -6844,6 +6848,10 @@ html[data-theme="dark"] .header-messages-link {
     min-height: 0;
   }
 
+  .messages-layout.has-selected-conversation .messages-sidebar {
+    display: none;
+  }
+
   .messages-sidebar {
     border-right: 0;
     border-bottom: 1px solid var(--line);
@@ -6855,6 +6863,25 @@ html[data-theme="dark"] .header-messages-link {
 
   .messages-conversation-top {
     padding: 12px;
+  }
+
+  .messages-mobile-back {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 7px;
+    color: var(--primary);
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  .messages-mobile-back svg {
+    width: 17px;
+    height: 17px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
   }
 
   .messages-item-card {
@@ -8815,10 +8842,17 @@ html[data-theme="dark"] .item-location-unavailable {
 }
 
 .site-header .mobile-tab-bar a,
-.site-header .mobile-tab-bar .mobile-notifications-button,
-.site-header .mobile-tab-bar a[aria-current="page"],
-.site-header .mobile-tab-bar a[href="/"] {
+.site-header .mobile-tab-bar .mobile-notifications-button {
   color: #e6f4f3;
+}
+
+.site-header .mobile-tab-bar a[aria-current="page"],
+.site-header .mobile-tab-bar .mobile-notifications-button[aria-expanded="true"] {
+  color: #4bd5cb;
+}
+
+.site-header .mobile-tab-bar a[aria-current="page"] small {
+  font-weight: 750;
 }
 
 @media (max-width: 991.98px) {
