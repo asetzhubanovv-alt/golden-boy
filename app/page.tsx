@@ -654,7 +654,7 @@ export default function Home() {
 
   return (
     <main className="foundly-shell container-fluid px-0">
-      <SiteHeader />
+      <SiteHeader active="feed" />
 
       <section aria-label="Foundly" className="foundly-promo">
         <div className="foundly-promo-inner container">

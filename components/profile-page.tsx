@@ -313,7 +313,7 @@ export default function ProfilePage() {
 
   return (
     <main className="foundly-shell container-fluid px-0">
-      <SiteHeader />
+      <SiteHeader active="profile" />
       <section className="profile-edit-page container">
         <BackLink />
         {!isReady ? <p>Проверяем аккаунт…</p> : !user ? (

@@ -9,7 +9,7 @@ import { OPEN_NOTIFICATIONS_EVENT } from "@/lib/use-item-notifications";
 import type { Language } from "@/lib/messages";
 
 type SiteHeaderProps = {
-  active?: "feed" | "add" | "item" | "about" | "favorites" | "messages" | "none";
+  active?: "feed" | "add" | "item" | "about" | "favorites" | "messages" | "profile" | "none";
 };
 
 export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
@@ -60,18 +60,34 @@ export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
           </Link>
         </div>
       </div>
-      <nav className="mobile-tab-bar" aria-label="Основная навигация">
-        <Link href="/" aria-current={active === "feed" ? "page" : undefined} aria-label="Главная"><span aria-hidden="true">⌂</span><small>Главная</small></Link>
-        <Link href="/#feed" aria-label="Поиск"><span aria-hidden="true">⌕</span><small>Поиск</small></Link>
-        <Link href="/add" aria-current={active === "add" ? "page" : undefined} aria-label="Добавить"><span aria-hidden="true">＋</span><small>Добавить</small></Link>
-        <Link href="/about" aria-current={active === "about" ? "page" : undefined} aria-label="О нас"><span aria-hidden="true">ⓘ</span><small>О нас</small></Link>
+      <nav className="mobile-tab-bar" aria-label={t("nav.mobilePrimary")}>
+        <Link
+          href="/"
+          aria-current={active === "feed" ? "page" : undefined}
+          aria-label={t("nav.mobileHome")}
+        >
+          <span aria-hidden="true">⌂</span>
+          <small>{t("nav.mobileHome")}</small>
+        </Link>
+        <Link href="/#feed" aria-label={t("nav.mobileSearch")}>
+          <span aria-hidden="true">⌕</span>
+          <small>{t("nav.mobileSearch")}</small>
+        </Link>
+        <Link
+          href="/add"
+          aria-current={active === "add" ? "page" : undefined}
+          aria-label={t("nav.mobileAdd")}
+        >
+          <span aria-hidden="true">＋</span>
+          <small>{t("nav.mobileAdd")}</small>
+        </Link>
         <Link
           href="/messages"
           aria-current={active === "messages" ? "page" : undefined}
           aria-label={`${t("nav.messages")}${unreadCounts.chat ? `: ${unreadCounts.chat}` : ""}`}
         >
           <span aria-hidden="true">✉</span>
-          <small>{t("nav.messages")}</small>
+          <small>{t("nav.mobileMessages")}</small>
           {unreadCounts.chat > 0 && (
             <span aria-hidden="true" className="mobile-tab-count-badge">
               {unreadCounts.chat > 99 ? "99+" : unreadCounts.chat}
@@ -105,7 +121,14 @@ export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
             </span>
           )}
         </button>
-        <Link href="/profile" aria-label="Профиль"><span aria-hidden="true">◉</span><small>Профиль</small></Link>
+        <Link
+          href="/profile"
+          aria-current={active === "profile" ? "page" : undefined}
+          aria-label={t("nav.mobileProfile")}
+        >
+          <span aria-hidden="true">◉</span>
+          <small>{t("nav.mobileProfile")}</small>
+        </Link>
       </nav>
     </header>
   );
