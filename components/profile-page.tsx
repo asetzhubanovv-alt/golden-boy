@@ -484,6 +484,9 @@ export default function ProfilePage() {
                                 >
                                   <div className="item-sighting-byline">
                                     <strong>
+                                      <span>
+                                        {t("profile.sightings.markedListing")}:{" "}
+                                      </span>
                                       <Link
                                         href={`/item/${encodeURIComponent(sighting.itemId)}?sighting=${encodeURIComponent(sighting.id)}#item-sightings`}
                                       >
@@ -501,8 +504,27 @@ export default function ProfilePage() {
                                       )}
                                     </time>
                                   </div>
+                                  {sighting.itemType && (
+                                    <small>
+                                      {t(
+                                        sighting.itemType === "lost"
+                                          ? "detail.lost"
+                                          : "detail.found",
+                                      )}
+                                    </small>
+                                  )}
+                                  {sighting.itemPlace && (
+                                    <p>
+                                      <strong>
+                                        {t("profile.sightings.listingLocation")}:{" "}
+                                      </strong>
+                                      {sighting.itemPlace}
+                                    </p>
+                                  )}
                                   <p>
-                                    <strong>{t("sighting.address")}: </strong>
+                                    <strong>
+                                      {t("profile.sightings.observedLocation")}:{" "}
+                                    </strong>
                                     {sighting.address ||
                                       `${sighting.latitude.toFixed(5)}, ${sighting.longitude.toFixed(5)}`}
                                   </p>

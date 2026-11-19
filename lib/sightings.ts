@@ -15,6 +15,8 @@ export type ItemSighting = {
   username: string;
   fullName: string;
   itemTitle: string;
+  itemPlace: string;
+  itemType: "lost" | "found" | null;
 };
 
 type ItemSightingRow = {
@@ -28,7 +30,7 @@ type ItemSightingRow = {
   comment: string;
   created_at: string;
   profiles: { username: string; full_name: string } | null;
-  items?: { title: string } | null;
+  items?: { title: string; location: string; type: "lost" | "found" } | null;
 };
 
 const sightingSelection =
@@ -60,6 +62,8 @@ function fromSightingRow(row: ItemSightingRow): ItemSighting {
     username: row.profiles?.username ?? "",
     fullName: row.profiles?.full_name ?? "",
     itemTitle: row.items?.title ?? "",
+    itemPlace: row.items?.location ?? "",
+    itemType: row.items?.type ?? null,
   };
 }
 
@@ -79,7 +83,7 @@ export async function getMyItemSightings(userId: string): Promise<ItemSighting[]
   const { data, error } = await getSupabaseClient()
     .from("item_sightings")
     .select(
-      `${sightingSelection},items!item_sightings_item_id_fkey(title)`,
+      `${sightingSelection},items!item_sightings_item_id_fkey(title,location,type)`,
     )
     .eq("user_id", userId)
     .order("observed_at", { ascending: false })
