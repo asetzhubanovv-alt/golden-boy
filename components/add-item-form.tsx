@@ -213,7 +213,7 @@ export default function AddItemForm({
       <main className="foundly-shell container-fluid px-0">
         <SiteHeader active="add" />
         <section className="auth-required-state container">
-          <p>Проверяем аккаунт...</p>
+          <p>{t("form.authLoading")}</p>
         </section>
         <SiteFooter />
       </main>
@@ -225,12 +225,9 @@ export default function AddItemForm({
       <main className="foundly-shell container-fluid px-0">
         <SiteHeader active="add" />
         <section className="auth-required-state container">
-          <span className="section-kicker">ПУБЛИКАЦИЯ ОБЪЯВЛЕНИЯ</span>
-          <h1>Сначала войди в аккаунт</h1>
-          <p>
-            Демо-аккаунт нужен, чтобы сохранить объявление за его автором и
-            управлять его статусом.
-          </p>
+          <span className="section-kicker">{t("form.authKicker")}</span>
+          <h1>{t("form.authTitle")}</h1>
+          <p>{t("form.authDescription")}</p>
           {authError && <Alert severity="error">{authError}</Alert>}
           <div className="auth-required-actions">
             <Button
@@ -238,10 +235,10 @@ export default function AddItemForm({
               href="/login"
               variant="contained"
             >
-              Войти
+              {t("form.authLogin")}
             </Button>
             <Button className="auth-secondary-button" href="/register">
-              Создать аккаунт
+              {t("form.authRegister")}
             </Button>
           </div>
         </section>

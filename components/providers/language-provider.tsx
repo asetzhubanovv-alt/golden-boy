@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
 import { translate, type Language } from "@/lib/messages";
 
 type LanguageContextValue = {
@@ -35,6 +35,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     getStoredLanguage,
     () => "ru",
   );
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
 
   function setLanguage(nextLanguage: Language) {
     document.documentElement.lang = nextLanguage;

@@ -14,6 +14,7 @@ export type ItemSighting = {
   createdAt: string;
   username: string;
   fullName: string;
+  itemTitle: string;
 };
 
 type ItemSightingRow = {
@@ -27,6 +28,7 @@ type ItemSightingRow = {
   comment: string;
   created_at: string;
   profiles: { username: string; full_name: string } | null;
+  items?: { title: string } | null;
 };
 
 const sightingSelection =
@@ -57,6 +59,7 @@ function fromSightingRow(row: ItemSightingRow): ItemSighting {
     createdAt: row.created_at,
     username: row.profiles?.username ?? "",
     fullName: row.profiles?.full_name ?? "",
+    itemTitle: row.items?.title ?? "",
   };
 }
 
@@ -69,6 +72,22 @@ export async function getItemSightings(itemId: string): Promise<ItemSighting[]> 
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`Не удалось загрузить отметки на карте: ${error.message}`);
+  return ((data ?? []) as unknown as ItemSightingRow[]).map(fromSightingRow);
+}
+
+export async function getMyItemSightings(userId: string): Promise<ItemSighting[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("item_sightings")
+    .select(
+      `${sightingSelection},items!item_sightings_item_id_fkey(title)`,
+    )
+    .eq("user_id", userId)
+    .order("observed_at", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Не удалось загрузить ваши отметки: ${error.message}`);
+  }
   return ((data ?? []) as unknown as ItemSightingRow[]).map(fromSightingRow);
 }
 

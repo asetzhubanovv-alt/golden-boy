@@ -44,11 +44,11 @@ export default function PublicProfilePage({ username }: { username: string }) {
         if (active) setItems(profileItems as unknown as ProfileItem[]);
       })
       .catch((loadError: unknown) => {
-        if (active) setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить профиль.");
+        if (active) setError(loadError instanceof Error ? loadError.message : t("publicProfile.loadError"));
       })
       .finally(() => { if (active) setReady(true); });
     return () => { active = false; };
-  }, [username]);
+  }, [t, username]);
 
   const visibleItems = items.filter((item) =>
     tab === "found" ? item.type === "found" : tab === "returned" ? item.status === "returned" : true,
@@ -59,20 +59,20 @@ export default function PublicProfilePage({ username }: { username: string }) {
       <SiteHeader />
       <section className="public-profile-page container">
         <BackLink />
-        {!ready ? <div className="detail-loading">Загружаем профиль…</div> : !profile ? (
-          <div className="profile-empty"><h1>Профиль не найден</h1><Link href="/">Вернуться в ленту</Link></div>
+        {!ready ? <div className="detail-loading">{t("publicProfile.loading")}</div> : !profile ? (
+          <div className="profile-empty"><h1>{t("publicProfile.notFound")}</h1><Link href="/">{t("publicProfile.back")}</Link></div>
         ) : (
           <>
             <header className="public-profile-header">
               <div className="profile-avatar-preview">
-                {profile.avatar_url ? <span role="img" aria-label="Аватар профиля" style={{ backgroundImage: `url("${profile.avatar_url}")` }} /> : <span>{(profile.full_name || profile.username).slice(0, 1).toUpperCase()}</span>}
+                {profile.avatar_url ? <span role="img" aria-label={t("publicProfile.avatar")} style={{ backgroundImage: `url("${profile.avatar_url}")` }} /> : <span>{(profile.full_name || profile.username).slice(0, 1).toUpperCase()}</span>}
               </div>
               <div>
                 <span className="profile-username">@{profile.username} {profile.is_verified && <VerifiedBadge />}</span>
                 <h1>{profile.full_name || profile.username}</h1>
                 {profile.role === "admin" && <span className="admin-badge">Admin</span>}
                 {profile.bio && <p>{profile.bio}</p>}
-                {(profile.faculty || profile.course) && <p>{[profile.faculty, profile.course ? `${profile.course} курс` : ""].filter(Boolean).join(" · ")}</p>}
+                {(profile.faculty || profile.course) && <p>{[profile.faculty, profile.course ? `${profile.course} ${t("publicProfile.course")}` : ""].filter(Boolean).join(" · ")}</p>}
                 {user?.id !== profile.id && (
                   <Link
                     className="profile-message-link"
@@ -83,17 +83,17 @@ export default function PublicProfilePage({ username }: { username: string }) {
                 )}
               </div>
             </header>
-            <div className="profile-tabs" role="tablist" aria-label="Объявления пользователя">
-              <button aria-selected={tab === "mine"} onClick={() => setTab("mine")} role="tab">Мои объявления</button>
-              <button aria-selected={tab === "found"} onClick={() => setTab("found")} role="tab">Найдено мной</button>
-              <button aria-selected={tab === "returned"} onClick={() => setTab("returned")} role="tab">Возвращено</button>
+            <div className="profile-tabs" role="tablist" aria-label={t("publicProfile.tabs")}>
+              <button aria-selected={tab === "mine"} onClick={() => setTab("mine")} role="tab">{t("publicProfile.mine")}</button>
+              <button aria-selected={tab === "found"} onClick={() => setTab("found")} role="tab">{t("publicProfile.found")}</button>
+              <button aria-selected={tab === "returned"} onClick={() => setTab("returned")} role="tab">{t("publicProfile.returned")}</button>
             </div>
             {error && <Alert severity="error">{error}</Alert>}
             {visibleItems.length ? <div className="profile-listings">{visibleItems.map((item) => (
               <Link className="profile-listing" href={`/item/${encodeURIComponent(item.id)}`} key={item.id}>
-                <strong>{item.title}</strong><span>{item.place}</span><small>{item.status === "returned" ? "Возвращено" : item.type === "found" ? "Найдено" : "Ищется"}</small>
+                <strong>{item.title}</strong><span>{item.place}</span><small>{item.status === "returned" ? t("publicProfile.returned") : item.type === "found" ? t("publicProfile.foundStatus") : t("publicProfile.searching")}</small>
               </Link>
-            ))}</div> : <p className="profile-empty-copy">В этой вкладке пока нет объявлений.</p>}
+            ))}</div> : <p className="profile-empty-copy">{t("publicProfile.empty")}</p>}
           </>
         )}
       </section>

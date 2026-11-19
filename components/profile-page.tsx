@@ -21,18 +21,16 @@ import { deleteStoredItem, getAllItems, updateStoredItem, type Item } from "@/li
 import { getLostItemProgress, getSimilarFoundItems } from "@/lib/item-matching";
 import { useFavoriteItems } from "@/lib/use-favorite-items";
 import RewardAmountField from "@/components/reward-amount-field";
+import { useLanguage } from "@/components/language-provider";
+import ItemSightingMap from "@/components/item-sighting-map";
+import { getMyItemSightings, type ItemSighting } from "@/lib/sightings";
 
-type ProfileTab = "listings" | "favorites" | "settings";
-
-const profileTabs: { id: ProfileTab; label: string }[] = [
-  { id: "listings", label: "Мои объявления" },
-  { id: "favorites", label: "Избранное" },
-  { id: "settings", label: "Редактирование" },
-];
+type ProfileTab = "listings" | "favorites" | "sightings" | "settings";
 
 export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { language, t } = useLanguage();
   const { user, isReady } = useDemoAuth();
   const { items: storedItems, error: itemsError, isReady: itemsReady } = useStoredItems();
   const { favoriteIds, toggleFavorite, error: favoritesError } = useFavoriteItems(user?.id ?? null);
@@ -50,6 +48,11 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [sightingsResult, setSightingsResult] = useState<{
+    userId: string;
+    sightings: ItemSighting[];
+    error: string;
+  } | null>(null);
   const [editingItemForm, setEditingItemForm] = useState({
     title: "",
     category: "",
@@ -65,9 +68,26 @@ export default function ProfilePage() {
 
   const requestedTab = searchParams.get("tab");
   const activeTab: ProfileTab =
-    requestedTab === "favorites" || requestedTab === "settings"
+    requestedTab === "favorites" ||
+    requestedTab === "sightings" ||
+    requestedTab === "settings"
       ? requestedTab
       : "listings";
+  const profileTabs: { id: ProfileTab; label: string }[] = [
+    { id: "listings", label: t("profile.tab.listings") },
+    { id: "favorites", label: t("profile.tab.favorites") },
+    { id: "sightings", label: t("profile.tab.sightings") },
+    { id: "settings", label: t("profile.tab.settings") },
+  ];
+  const locale =
+    language === "kk" ? "kk-KZ" : language === "en" ? "en-US" : "ru-RU";
+  const currentUserSightings =
+    sightingsResult && sightingsResult.userId === user?.id
+      ? sightingsResult
+      : null;
+  const isSightingsLoading = Boolean(user?.id) && !currentUserSightings;
+  const mySightings = currentUserSightings?.sightings ?? [];
+  const sightingsError = currentUserSightings?.error ?? "";
 
   function setActiveTab(tab: ProfileTab) {
     router.replace(tab === "listings" ? "/profile" : `/profile?tab=${tab}`, { scroll: false });
@@ -97,6 +117,38 @@ export default function ProfilePage() {
     });
     return () => { active = false; };
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const userId = user.id;
+    let active = true;
+    void getMyItemSightings(userId)
+      .then((loadedSightings) => {
+        if (active) {
+          setSightingsResult({
+            userId,
+            sightings: loadedSightings,
+            error: "",
+          });
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (active) {
+          setSightingsResult({
+            userId,
+            sightings: [],
+            error:
+              loadError instanceof Error
+                ? loadError.message
+                : t("profile.sightings.loadError"),
+          });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [t, user?.id]);
 
   const completedFields = [
     username.trim(),
@@ -325,8 +377,8 @@ export default function ProfilePage() {
       <SiteHeader active="profile" />
       <section className="profile-edit-page container">
         <BackLink />
-        {!isReady ? <p>Проверяем аккаунт…</p> : !user ? (
-          <div className="profile-empty"><h1>Войдите в аккаунт</h1><p>Чтобы просматривать и редактировать профиль.</p><Button href="/login" variant="contained">Войти</Button></div>
+        {!isReady ? <p>{t("profile.loading")}</p> : !user ? (
+          <div className="profile-empty"><h1>{t("profile.signInTitle")}</h1><p>{t("profile.signInDescription")}</p><Button href="/login" variant="contained">{t("nav.login")}</Button></div>
         ) : (
           <>
             <header className="profile-page-heading"><span className="section-kicker">ВАШ АККАУНТ</span><h1>Профиль</h1></header>
@@ -390,6 +442,89 @@ export default function ProfilePage() {
                       <>
                         <div className="account-section-heading"><div><span className="section-kicker">СОХРАНЁННОЕ</span><h2>Избранное</h2></div></div>
                         {favoriteItems.length ? <div className="account-list">{favoriteItems.map((item) => renderItemRow(item, true))}</div> : <div className="account-empty"><span aria-hidden="true">♡</span><h3>Пока ничего не сохранено</h3><p>Нажмите на сердечко в объявлении, чтобы быстро вернуться к нему.</p><Button href="/" variant="outlined">Посмотреть объявления</Button></div>}
+                      </>
+                    )}
+                    {activeTab === "sightings" && (
+                      <>
+                        <header className="item-sightings-heading">
+                          <div>
+                            <span className="section-kicker">
+                              {t("profile.sightings.kicker")}
+                            </span>
+                            <h2>{t("profile.sightings.title")}</h2>
+                          </div>
+                          <span className="profile-sighting-count">
+                            {mySightings.length}
+                          </span>
+                        </header>
+                        {sightingsError && (
+                          <Alert severity="error">{sightingsError}</Alert>
+                        )}
+                        {isSightingsLoading ? (
+                          <p>{t("profile.sightings.loading")}</p>
+                        ) : mySightings.length ? (
+                          <>
+                            <ItemSightingMap
+                              mode="sightings"
+                              sightings={mySightings}
+                            />
+                            <div className="item-sighting-list profile-sighting-list">
+                              {mySightings.map((sighting) => (
+                                <article
+                                  className="item-sighting-card"
+                                  key={sighting.id}
+                                >
+                                  <div className="item-sighting-byline">
+                                    <strong>
+                                      <Link
+                                        href={`/item/${encodeURIComponent(sighting.itemId)}?sighting=${encodeURIComponent(sighting.id)}#item-sightings`}
+                                      >
+                                        {sighting.itemTitle ||
+                                          t("profile.sightings.untitledItem")}
+                                      </Link>
+                                    </strong>
+                                    <time dateTime={sighting.observedAt}>
+                                      {new Intl.DateTimeFormat(locale, {
+                                        day: "numeric",
+                                        month: "long",
+                                        year: "numeric",
+                                      }).format(
+                                        new Date(`${sighting.observedAt}T12:00:00`),
+                                      )}
+                                    </time>
+                                  </div>
+                                  <p>
+                                    <strong>{t("sighting.address")}: </strong>
+                                    {sighting.address ||
+                                      `${sighting.latitude.toFixed(5)}, ${sighting.longitude.toFixed(5)}`}
+                                  </p>
+                                  {sighting.comment && (
+                                    <p>
+                                      <strong>{t("profile.sightings.commentLabel")}: </strong>
+                                      {sighting.comment}
+                                    </p>
+                                  )}
+                                  <small className="profile-sighting-saved-at">
+                                    {t("profile.sightings.savedAt")}{" "}
+                                    {new Intl.DateTimeFormat(locale, {
+                                      dateStyle: "medium",
+                                      timeStyle: "short",
+                                    }).format(new Date(sighting.createdAt))}
+                                  </small>
+                                </article>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="account-empty">
+                            <span aria-hidden="true">⌖</span>
+                            <h3>{t("profile.sightings.emptyTitle")}</h3>
+                            <p>{t("profile.sightings.emptyDescription")}</p>
+                            <Button href="/" variant="outlined">
+                              {t("profile.sightings.browse")}
+                            </Button>
+                          </div>
+                        )}
                       </>
                     )}
                     {activeTab === "settings" && (

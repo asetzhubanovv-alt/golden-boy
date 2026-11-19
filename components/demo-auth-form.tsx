@@ -8,12 +8,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
 import { loginDemoUser, registerDemoUser } from "@/lib/demo-auth";
+import { useLanguage } from "@/components/language-provider";
 
 type DemoAuthFormProps = {
   mode: "login" | "register";
 };
 
 export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
+  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRegister = mode === "register";
@@ -40,7 +42,7 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
     setSuccess("");
 
     if (isRegister && password !== confirmPassword) {
-      setError("Пароли не совпадают.");
+      setError(t("auth.passwordMismatch"));
       return;
     }
 
@@ -49,7 +51,7 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
       if (isRegister) {
         const result = await registerDemoUser(name, email, password);
         if (result.needsEmailConfirmation) {
-          setSuccess("Аккаунт создан. Подтверди email по ссылке из письма, затем войди.");
+          setSuccess(t("auth.emailConfirmation"));
           setIsSubmitting(false);
           return;
         }
@@ -61,7 +63,7 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
       setError(
         authError instanceof Error
           ? authError.message
-          : "Не удалось выполнить действие. Проверь хранилище браузера.",
+          : t("auth.fallbackError"),
       );
       setIsSubmitting(false);
     }
@@ -78,12 +80,12 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
             <span>foundly</span>
           </Link>
 
-          <span className="section-kicker">СООБЩЕСТВО КАМПУСА</span>
-          <h1>{isRegister ? "Создать аккаунт" : "С возвращением!"}</h1>
+          <span className="section-kicker">{t("auth.kicker")}</span>
+          <h1>{isRegister ? t("auth.registerTitle") : t("auth.loginTitle")}</h1>
           <p className="auth-intro">
             {isRegister
-              ? "Зарегистрируйся, чтобы публиковать объявления и помогать вещам находиться."
-              : "Войди, чтобы управлять своими объявлениями."}
+              ? t("auth.registerIntro")
+              : t("auth.loginIntro")}
           </p>
 
           {error && (
@@ -97,14 +99,14 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
             {isRegister && (
               <label className="form-group">
                 <span className="form-label">
-                  Имя <span>*</span>
+                  {t("auth.name")} <span>*</span>
                 </span>
                 <input
                   autoComplete="name"
                   maxLength={60}
                   minLength={2}
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="Как к тебе обращаться"
+                  placeholder={t("auth.namePlaceholder")}
                   required
                   value={name}
                 />
@@ -113,7 +115,7 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
 
             <label className="form-group">
               <span className="form-label">
-                Email <span>*</span>
+                {t("auth.email")} <span>*</span>
               </span>
               <input
                 autoComplete="email"
@@ -127,13 +129,13 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
 
             <label className="form-group">
               <span className="form-label">
-                Пароль <span>*</span>
+                {t("auth.password")} <span>*</span>
               </span>
               <input
                 autoComplete={isRegister ? "new-password" : "current-password"}
                 minLength={isRegister ? 8 : undefined}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder={isRegister ? "Минимум 8 символов" : "Введите пароль"}
+                placeholder={isRegister ? t("auth.passwordMin") : t("auth.passwordEnter")}
                 required
                 type="password"
                 value={password}
@@ -143,13 +145,13 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
             {isRegister && (
               <label className="form-group">
                 <span className="form-label">
-                  Повтори пароль <span>*</span>
+                  {t("auth.passwordRepeat")} <span>*</span>
                 </span>
                 <input
                   autoComplete="new-password"
                   minLength={8}
                   onChange={(event) => setConfirmPassword(event.target.value)}
-                  placeholder="Ещё раз введи пароль"
+                  placeholder={t("auth.passwordRepeatPlaceholder")}
                   required
                   type="password"
                   value={confirmPassword}
@@ -164,22 +166,22 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
               variant="contained"
             >
               {isSubmitting
-                ? "Подожди..."
+                ? t("auth.wait")
                 : isRegister
-                  ? "Зарегистрироваться"
-                  : "Войти"}
+                  ? t("auth.register")
+                  : t("auth.login")}
             </Button>
           </form>
 
           <p className="auth-switch">
-            {isRegister ? "Уже есть аккаунт?" : "Впервые в Foundly?"}{" "}
+            {isRegister ? t("auth.hasAccount") : t("auth.newToFoundly")}{" "}
             <Link href={authSwitchHref}>
-              {isRegister ? "Войти" : "Зарегистрироваться"}
+              {isRegister ? t("auth.login") : t("auth.registerLink")}
             </Link>
           </p>
           {!isRegister && (
             <p className="auth-switch">
-              <Link href="/forgot-password">Забыли пароль?</Link>
+              <Link href="/forgot-password">{t("auth.forgotPassword")}</Link>
             </p>
           )}
         </div>
