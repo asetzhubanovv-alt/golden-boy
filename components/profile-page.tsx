@@ -256,6 +256,14 @@ export default function ProfilePage() {
     () => storedItems.filter((item) => item.ownerId === user?.id),
     [storedItems, user?.id],
   );
+  const createdListings = useMemo(
+    () =>
+      [...ownItems].sort(
+        (left, right) =>
+          Date.parse(right.createdAt ?? "") - Date.parse(left.createdAt ?? ""),
+      ),
+    [ownItems],
+  );
   const favoriteItems = useMemo(
     () => allItems.filter((item) => favoriteIds.includes(item.id)),
     [allItems, favoriteIds],
@@ -525,6 +533,72 @@ export default function ProfilePage() {
                             </Button>
                           </div>
                         )}
+                        <section className="profile-created-listings">
+                          <header className="item-sightings-heading">
+                            <div>
+                              <span className="section-kicker">
+                                {t("profile.activity.kicker")}
+                              </span>
+                              <h2>{t("profile.activity.title")}</h2>
+                            </div>
+                            <span>{createdListings.length}</span>
+                          </header>
+                          {createdListings.length ? (
+                            <div className="item-sighting-list">
+                              {createdListings.map((item) => {
+                                const createdAt = item.createdAt
+                                  ? new Date(item.createdAt)
+                                  : null;
+                                return (
+                                  <article
+                                    className="item-sighting-card"
+                                    key={item.id}
+                                  >
+                                    <div className="item-sighting-byline">
+                                      <strong>
+                                        <Link
+                                          href={`/item/${encodeURIComponent(item.id)}`}
+                                        >
+                                          {item.title}
+                                        </Link>
+                                      </strong>
+                                      {createdAt &&
+                                        !Number.isNaN(createdAt.getTime()) && (
+                                          <time dateTime={item.createdAt}>
+                                            {new Intl.DateTimeFormat(locale, {
+                                              dateStyle: "medium",
+                                              timeStyle: "short",
+                                            }).format(createdAt)}
+                                          </time>
+                                        )}
+                                    </div>
+                                    <small>
+                                      {t("profile.activity.listingAdded")} ·{" "}
+                                      {t(
+                                        item.type === "lost"
+                                          ? "detail.lost"
+                                          : "detail.found",
+                                      )}
+                                    </small>
+                                    <p>
+                                      <strong>{t("detail.place")}: </strong>
+                                      {item.place}
+                                    </p>
+                                  </article>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="account-empty">
+                              <span aria-hidden="true">＋</span>
+                              <h3>{t("profile.activity.emptyTitle")}</h3>
+                              <p>{t("profile.activity.emptyDescription")}</p>
+                              <Button href="/add" variant="outlined">
+                                {t("profile.activity.create")}
+                              </Button>
+                            </div>
+                          )}
+                        </section>
                       </>
                     )}
                     {activeTab === "settings" && (

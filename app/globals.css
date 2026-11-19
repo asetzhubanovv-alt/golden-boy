@@ -5862,6 +5862,10 @@ html[data-theme="dark"] .profile-completion progress {
   margin-top: 12px;
 }
 
+.profile-created-listings {
+  margin-top: 28px;
+}
+
 .item-sighting-card {
   display: flex;
   min-width: 0;
