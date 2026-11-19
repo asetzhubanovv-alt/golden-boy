@@ -31,6 +31,8 @@ begin
       description text not null default '',
       category text not null,
       location text not null,
+      latitude double precision,
+      longitude double precision,
       date date not null,
       photos text[] not null default '{}',
       price numeric(12,2),
@@ -91,12 +93,26 @@ begin
 end
 $$;
 
+alter table public.items add column if not exists latitude double precision;
+alter table public.items add column if not exists longitude double precision;
+
 create index if not exists items_created_at_idx on public.items (created_at desc);
 create index if not exists items_user_id_idx on public.items (user_id);
 create index if not exists items_status_idx on public.items (status);
 
 do $$
 begin
+  if not exists (select 1 from pg_constraint where conrelid='public.items'::regclass and conname='items_location_coordinates_check') then
+    alter table public.items add constraint items_location_coordinates_check
+      check (
+        (latitude is null and longitude is null)
+        or (
+          latitude is not null and longitude is not null
+          and latitude between -90 and 90
+          and longitude between -180 and 180
+        )
+      );
+  end if;
   if not exists (select 1 from pg_constraint where conrelid='public.items'::regclass and conname='items_description_length_check') then
     alter table public.items add constraint items_description_length_check
       check (char_length(description) <= 1500);
@@ -395,13 +411,13 @@ create policy "Admins delete reports"
 -- Data API privileges are explicit; RLS remains the row-level boundary.
 revoke select on public.items from anon, authenticated;
 revoke select (contact_method) on public.items from anon, authenticated;
-grant select (id, user_id, type, title, description, category, location, date, photos, price, reward_amount, status, created_at, updated_at)
+grant select (id, user_id, type, title, description, category, location, latitude, longitude, date, photos, price, reward_amount, status, created_at, updated_at)
   on public.items to anon, authenticated;
 revoke insert, update on public.items from authenticated;
 revoke insert (contact_method), update (contact_method) on public.items from authenticated;
-grant insert (id, user_id, type, title, description, category, location, date, photos, price, reward_amount, status)
+grant insert (id, user_id, type, title, description, category, location, latitude, longitude, date, photos, price, reward_amount, status)
   on public.items to authenticated;
-grant update (title, description, category, location, date, photos, price, reward_amount, status)
+grant update (title, description, category, location, latitude, longitude, date, photos, price, reward_amount, status)
   on public.items to authenticated;
 grant delete on public.items to authenticated;
 grant insert on public.reports to authenticated;

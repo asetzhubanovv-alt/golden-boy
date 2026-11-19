@@ -7,9 +7,15 @@ import { useFavorites } from "@/components/favorites-provider";
 import ListingCard from "@/components/listing-card";
 import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
-import { formatItemDate, getAllItems } from "@/lib/items";
+import {
+  formatItemDate,
+  getAllItems,
+  getDistanceInKm,
+  type ItemLocation,
+} from "@/lib/items";
 import { useStoredItems, useTodayDate } from "@/lib/use-stored-items";
 import { useLanguage } from "@/components/language-provider";
+import GoogleMapLocation from "@/components/google-map-location";
 
 type TimeFilter = "all" | "today" | "week";
 type StatusFilter = "all" | "searching" | "found" | "returned";
@@ -31,6 +37,8 @@ type Filters = {
   type: "all" | ItemType;
   time: TimeFilter;
   status: StatusFilter;
+  location: ItemLocation;
+  radiusKm: number;
 };
 
 const ITEMS_PER_PAGE = 9;
@@ -39,6 +47,8 @@ const DEFAULT_FILTERS: Filters = {
   type: "all",
   time: "all",
   status: "all",
+  location: { address: "", latitude: null, longitude: null },
+  radiusKm: 5,
 };
 
 type TextEntry = {
@@ -96,6 +106,9 @@ type TranslationSet = {
     typeLabel: string;
     dateLabel: string;
     statusLabel: string;
+    locationLabel: string;
+    radiusLabel: string;
+    nearbyUnit: string;
     anyStatus: string;
     searching: string;
     foundStatus: string;
@@ -182,6 +195,9 @@ const translations: Record<Language, TranslationSet> = {
       typeLabel: "Хабарландыру түрі",
       dateLabel: "Жарияланған күні",
       statusLabel: "Хабарландыру күйі",
+      locationLabel: "Орналасқан жері",
+      radiusLabel: "Іздеу радиусы",
+      nearbyUnit: "км",
       anyStatus: "Кез келген күй",
       searching: "Ізделуде",
       foundStatus: "Табылды",
@@ -264,6 +280,9 @@ const translations: Record<Language, TranslationSet> = {
       typeLabel: "Тип объявления",
       dateLabel: "Дата публикации",
       statusLabel: "Статус объявления",
+      locationLabel: "Местоположение",
+      radiusLabel: "Радиус поиска",
+      nearbyUnit: "км",
       anyStatus: "Любой статус",
       searching: "Ищется",
       foundStatus: "Найдено",
@@ -346,6 +365,9 @@ const translations: Record<Language, TranslationSet> = {
       typeLabel: "Listing type",
       dateLabel: "Date posted",
       statusLabel: "Listing status",
+      locationLabel: "Location",
+      radiusLabel: "Search radius",
+      nearbyUnit: "km",
       anyStatus: "Any status",
       searching: "Searching",
       foundStatus: "Found",
@@ -541,7 +563,8 @@ export default function Home() {
   const activeFilterCount = Number(filters.category !== "all") +
     Number(filters.type !== "all") +
     Number(filters.time !== "all") +
-    Number(filters.status !== "all");
+    Number(filters.status !== "all") +
+    Number(filters.location.latitude !== null && filters.location.longitude !== null);
 
   useEffect(() => {
     if (!isFilterDialogOpen) return;
@@ -594,13 +617,26 @@ export default function Home() {
         filters.time === "all" ||
         (filters.time === "today" && age === 0) ||
         (filters.time === "week" && age >= 0 && age <= 7);
+      const filterLatitude = filters.location.latitude;
+      const filterLongitude = filters.location.longitude;
+      const matchesLocation =
+        filterLatitude === null ||
+        filterLongitude === null ||
+        (item.latitude != null &&
+          item.longitude != null &&
+          getDistanceInKm(
+            { latitude: filterLatitude, longitude: filterLongitude },
+            { latitude: item.latitude, longitude: item.longitude },
+          ) <=
+            filters.radiusKm);
 
       return (
         matchesQuery &&
         matchesType &&
         matchesStatus &&
         matchesCategory &&
-        matchesTime
+        matchesTime &&
+        matchesLocation
       );
     });
   }, [filters, items, language, query, today]);
@@ -858,6 +894,35 @@ export default function Home() {
                     ))}
                   </select>
                 </label>
+                <fieldset className="location-filter">
+                  <legend>{t.filters.locationLabel}</legend>
+                  <GoogleMapLocation
+                    compact
+                    language={language}
+                    onChange={(location) => {
+                      setDraftFilters((current) => ({ ...current, location }));
+                    }}
+                    value={draftFilters.location}
+                  />
+                  <label className="status-filter location-radius">
+                    <span>{t.filters.radiusLabel}</span>
+                    <select
+                      onChange={(event) => {
+                        setDraftFilters((current) => ({
+                          ...current,
+                          radiusKm: Number(event.target.value),
+                        }));
+                      }}
+                      value={draftFilters.radiusKm}
+                    >
+                      {[1, 3, 5, 10, 25, 50].map((radius) => (
+                        <option key={radius} value={radius}>
+                          {radius} {t.filters.nearbyUnit}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </fieldset>
               </div>
               <footer className="filter-dialog-footer">
                 <button
@@ -888,7 +953,9 @@ export default function Home() {
             filters.category !== "all" ||
             filters.type !== "all" ||
             filters.time !== "all" ||
-            filters.status !== "all") && (
+            filters.status !== "all" ||
+            (filters.location.latitude !== null &&
+              filters.location.longitude !== null)) && (
             <button className="reset-button" onClick={resetFilters} type="button">
               {t.filters.reset} <span aria-hidden="true">×</span>
             </button>
