@@ -60,11 +60,20 @@ export default function ListingCard({
               <span className="art-symbol">{item.symbol}</span>
             </>
           )}
-          <Chip
-            className={`type-badge ${item.type}`}
-            label={item.type === "lost" ? labels.lost : labels.found}
-            size="small"
-          />
+          <div className="listing-badges">
+            <Chip
+              className={`type-badge ${item.type}`}
+              label={item.type === "lost" ? labels.lost : labels.found}
+              size="small"
+            />
+            {item.type === "lost" && item.rewardAmount != null && item.rewardAmount > 0 && (
+              <Chip
+                className="reward-badge"
+                label="💰 ВОЗНАГРАЖДЕНИЕ"
+                size="small"
+              />
+            )}
+          </div>
         </div>
         <div className="item-card-content">
           <div className="item-card-title-row">
@@ -80,6 +89,15 @@ export default function ListingCard({
             </span>
             <span className="art-date">{dateLabel}</span>
           </div>
+          {item.type === "lost" && item.rewardAmount != null && item.rewardAmount > 0 && (
+            <p className="item-reward-amount">
+              {new Intl.NumberFormat("ru-KZ", {
+                style: "currency",
+                currency: "KZT",
+                maximumFractionDigits: 0,
+              }).format(item.rewardAmount)}
+            </p>
+          )}
           {item.ownerUsername && (
             <span className="item-author">
               @{item.ownerUsername}

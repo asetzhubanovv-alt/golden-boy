@@ -20,6 +20,7 @@ export type Item = {
   imageDataUrl?: string;
   imageDataUrls?: string[];
   price?: number | null;
+  rewardAmount?: number | null;
   ownerId?: string;
   ownerUsername?: string;
   ownerFullName?: string;
@@ -142,6 +143,7 @@ type ItemRow = {
   date: string;
   photos: string[];
   price: number | null;
+  reward_amount: number | string | null;
   status: "active" | "returned" | "hidden";
   description: string;
   created_at: string;
@@ -181,6 +183,7 @@ function fromItemRow(row: ItemRow): Item {
       ? { imageDataUrl: row.photos[0], imageDataUrls: row.photos }
       : {}),
     price: row.price,
+    rewardAmount: row.reward_amount == null ? null : Number(row.reward_amount),
     ownerId: row.user_id,
     ownerUsername: row.profiles?.username,
     ownerFullName: row.profiles?.full_name,
@@ -189,7 +192,7 @@ function fromItemRow(row: ItemRow): Item {
 }
 
 const itemSelection =
-  "id,user_id,title,category,type,location,date,photos,price,status,description,created_at,profiles!items_user_profile_fkey(username,full_name,is_verified)";
+  "id,user_id,title,category,type,location,date,photos,price,reward_amount,status,description,created_at,profiles!items_user_profile_fkey(username,full_name,is_verified)";
 
 function normalizePrice(price: number | null | undefined): number | null {
   if (price === null || price === undefined) return null;
@@ -202,6 +205,20 @@ function normalizePrice(price: number | null | undefined): number | null {
     throw new Error("Цена должна быть неотрицательной и содержать не более двух знаков после запятой.");
   }
   return price;
+}
+
+function normalizeRewardAmount(
+  amount: number | null | undefined,
+  type: ItemType,
+): number | null {
+  if (amount === null || amount === undefined) return null;
+  if (type !== "lost") {
+    throw new Error("Вознаграждение можно указать только для потерянной вещи.");
+  }
+  if (!Number.isSafeInteger(amount) || amount < 1 || amount > 999_999_999_999) {
+    throw new Error("Сумма вознаграждения должна быть целым числом от 1 до 999 999 999 999 ₸.");
+  }
+  return amount;
 }
 
 export async function getStoredItems(): Promise<Item[]> {
@@ -255,6 +272,7 @@ export async function saveItem(item: Item): Promise<void> {
     description: item.details,
     photos,
     price: normalizePrice(item.price),
+    reward_amount: normalizeRewardAmount(item.rewardAmount, item.type),
     user_id: item.ownerId,
     });
 
@@ -278,7 +296,7 @@ export async function saveItem(item: Item): Promise<void> {
 export async function updateStoredItem(
   id: string,
   ownerId: string,
-  updates: Partial<Pick<Item, "status" | "title" | "category" | "type" | "place" | "date" | "details" | "price">>,
+  updates: Partial<Pick<Item, "status" | "title" | "category" | "type" | "place" | "date" | "details" | "price" | "rewardAmount">>,
 ): Promise<Item> {
   const databaseUpdates: Record<string, string | number | null> = {};
   if (updates.status) {
@@ -291,6 +309,20 @@ export async function updateStoredItem(
   if (updates.date !== undefined) databaseUpdates.date = updates.date;
   if (updates.details !== undefined) databaseUpdates.description = updates.details.trim();
   if (updates.price !== undefined) databaseUpdates.price = normalizePrice(updates.price);
+  if (updates.type === "found") {
+    if (updates.rewardAmount != null) {
+      throw new Error("Вознаграждение можно указать только для потерянной вещи.");
+    }
+    databaseUpdates.reward_amount = null;
+  } else if (updates.rewardAmount !== undefined) {
+    if (updates.rewardAmount === null) {
+      databaseUpdates.reward_amount = null;
+    } else if (updates.type !== "lost") {
+      throw new Error("Чтобы изменить вознаграждение, укажите объявление о потерянной вещи.");
+    } else {
+      databaseUpdates.reward_amount = normalizeRewardAmount(updates.rewardAmount, updates.type);
+    }
+  }
   const { data, error } = await getSupabaseClient()
     .from("items")
     .update(databaseUpdates)

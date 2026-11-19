@@ -24,6 +24,7 @@ import {
 import { categoryTranslationKey } from "@/lib/messages";
 import { useTodayDate } from "@/lib/use-stored-items";
 import { useDemoAuth } from "@/lib/use-demo-auth";
+import RewardAmountField from "@/components/reward-amount-field";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_IMAGES = 3;
@@ -78,6 +79,8 @@ export default function AddItemForm({
   const [details, setDetails] = useState("");
   const [place, setPlace] = useState("");
   const [date, setDate] = useState("");
+  const [rewardOffered, setRewardOffered] = useState(false);
+  const [rewardAmount, setRewardAmount] = useState("");
   const [imageDataUrls, setImageDataUrls] = useState<string[]>([]);
   const [imageNames, setImageNames] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -139,6 +142,16 @@ export default function AddItemForm({
       setError(t("form.error.date"));
       return;
     }
+    if (
+      type === "lost" &&
+      rewardOffered &&
+      (!Number.isSafeInteger(Number(rewardAmount)) ||
+        Number(rewardAmount) < 1 ||
+        Number(rewardAmount) > 999_999_999_999)
+    ) {
+      setError(t("form.error.rewardAmount"));
+      return;
+    }
 
     setIsSaving(true);
     const { art, symbol } = getItemArt(category);
@@ -160,6 +173,8 @@ export default function AddItemForm({
         symbol,
         details: details.trim(),
         ownerId: user.id,
+        rewardAmount:
+          type === "lost" && rewardOffered ? Number(rewardAmount) : null,
         ...(imageDataUrls.length ? { imageDataUrls } : {}),
       });
       router.push(`/item/${itemId}`);
@@ -263,7 +278,11 @@ export default function AddItemForm({
                 <button
                   aria-pressed={type === "found"}
                   className={`kind-option ${type === "found" ? "selected" : ""}`}
-                  onClick={() => setType("found")}
+                  onClick={() => {
+                    setType("found");
+                    setRewardOffered(false);
+                    setRewardAmount("");
+                  }}
                   type="button"
                 >
                   <span className="kind-icon found-kind" aria-hidden="true">
@@ -356,6 +375,17 @@ export default function AddItemForm({
                 />
               </label>
             </div>
+
+            <RewardAmountField
+              amount={rewardAmount}
+              enabled={rewardOffered}
+              itemType={type}
+              onAmountChange={setRewardAmount}
+              onEnabledChange={(enabled) => {
+                setRewardOffered(enabled);
+                if (!enabled) setRewardAmount("");
+              }}
+            />
 
             <div className="form-group">
               <span className="form-label">{t("form.photo")}</span>

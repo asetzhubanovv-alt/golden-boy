@@ -382,13 +382,40 @@ export default function HeaderAccount({
                         >
                           <span aria-hidden="true" className="notification-popover-item-icon">✦</span>
                           <div>
-                            <span className="match-label">
-                              {notification.read
-                                ? t("notifications.match")
-                                : t("notifications.newMatch")}
-                            </span>
-                            <h3>{t("notifications.foundPrefix")} {notification.foundTitle}</h3>
-                            <p>{notification.lostTitle} · {notification.foundPlace}</p>
+                            {notification.kind === "ownership_claim" ? (
+                              <>
+                                <span className="match-label">
+                                  {notification.read
+                                    ? t("notifications.ownershipClaim")
+                                    : t("notifications.newOwnershipClaim")}
+                                </span>
+                                <h3>{notification.itemTitle}</h3>
+                                <p>{notification.message}</p>
+                              </>
+                            ) : notification.kind === "sighting" ? (
+                              <>
+                                <span className="match-label">
+                                  {notification.read
+                                    ? t("notifications.sighting")
+                                    : t("notifications.newSighting")}
+                                </span>
+                                <h3>{notification.itemTitle}</h3>
+                                <p>
+                                  {notification.comment ||
+                                    `${notification.observedAt} · ${notification.latitude.toFixed(5)}, ${notification.longitude.toFixed(5)}`}
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <span className="match-label">
+                                  {notification.read
+                                    ? t("notifications.match")
+                                    : t("notifications.newMatch")}
+                                </span>
+                                <h3>{t("notifications.foundPrefix")} {notification.foundTitle}</h3>
+                                <p>{notification.lostTitle} · {notification.foundPlace}</p>
+                              </>
+                            )}
                             <time dateTime={notification.createdAt}>
                               {new Intl.DateTimeFormat(locale, {
                                 day: "numeric",
@@ -397,13 +424,23 @@ export default function HeaderAccount({
                               }).format(new Date(notification.createdAt))}
                             </time>
                             <Link
-                              href={`/item/${encodeURIComponent(notification.foundItemId)}`}
+                              href={`/item/${encodeURIComponent(
+                                notification.kind === "ownership_claim"
+                                  ? notification.itemId
+                                  : notification.kind === "sighting"
+                                    ? notification.itemId
+                                  : notification.foundItemId,
+                              )}${notification.kind === "sighting" ? `?sighting=${encodeURIComponent(notification.sightingId)}#item-sightings` : ""}`}
                               onClick={() => {
                                 markRead(notification.id);
                                 onNotificationsOpenChange(false);
                               }}
                             >
-                              {t("notifications.openFound")}
+                              {notification.kind === "ownership_claim"
+                                ? t("notifications.reviewOwnershipClaim")
+                                : notification.kind === "sighting"
+                                  ? t("notifications.openSighting")
+                                  : t("notifications.openFound")}
                             </Link>
                           </div>
                         </article>

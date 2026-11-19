@@ -131,9 +131,9 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
               </span>
               <input
                 autoComplete={isRegister ? "new-password" : "current-password"}
-                minLength={8}
+                minLength={isRegister ? 8 : undefined}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="Минимум 8 символов"
+                placeholder={isRegister ? "Минимум 8 символов" : "Введите пароль"}
                 required
                 type="password"
                 value={password}

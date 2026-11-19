@@ -17,7 +17,8 @@ import { getStoredItems, type Item } from "@/lib/items";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useDemoAuth } from "@/lib/use-demo-auth";
 
-export type ItemNotification = {
+type ItemMatchNotification = {
+  kind: "match";
   id: string;
   lostItemId: string;
   lostTitle: string;
@@ -27,6 +28,36 @@ export type ItemNotification = {
   createdAt: string;
   read: boolean;
 };
+
+type OwnershipClaimNotification = {
+  kind: "ownership_claim";
+  id: string;
+  itemId: string;
+  itemTitle: string;
+  message: string;
+  createdAt: string;
+  read: boolean;
+};
+
+type ItemSightingNotification = {
+  kind: "sighting";
+  id: string;
+  sightingId: string;
+  itemId: string;
+  itemTitle: string;
+  senderId: string;
+  latitude: number;
+  longitude: number;
+  observedAt: string;
+  comment: string;
+  createdAt: string;
+  read: boolean;
+};
+
+export type ItemNotification =
+  | ItemMatchNotification
+  | OwnershipClaimNotification
+  | ItemSightingNotification;
 
 export type ItemSubscription = {
   itemId: string;
@@ -74,6 +105,54 @@ function getSubscriptionSnapshot(userId: string | null) {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isOwnershipClaimNotification(value: unknown): value is OwnershipClaimNotification {
+  return isRecord(value) &&
+    value.kind === "ownership_claim" &&
+    typeof value.id === "string" &&
+    typeof value.itemId === "string" &&
+    typeof value.itemTitle === "string" &&
+    typeof value.message === "string" &&
+    typeof value.createdAt === "string" &&
+    typeof value.read === "boolean";
+}
+
+function isItemSightingNotification(value: unknown): value is ItemSightingNotification {
+  return isRecord(value) &&
+    value.kind === "sighting" &&
+    typeof value.id === "string" &&
+    typeof value.sightingId === "string" &&
+    typeof value.itemId === "string" &&
+    typeof value.itemTitle === "string" &&
+    typeof value.senderId === "string" &&
+    typeof value.latitude === "number" &&
+    Number.isFinite(value.latitude) &&
+    typeof value.longitude === "number" &&
+    Number.isFinite(value.longitude) &&
+    typeof value.observedAt === "string" &&
+    typeof value.comment === "string" &&
+    typeof value.createdAt === "string" &&
+    typeof value.read === "boolean";
+}
+
+function isLegacyOrMatchNotification(
+  value: unknown,
+): value is Omit<ItemMatchNotification, "kind"> | ItemMatchNotification {
+  return isRecord(value) &&
+    (value.kind === undefined || value.kind === "match") &&
+    typeof value.id === "string" &&
+    typeof value.lostItemId === "string" &&
+    typeof value.lostTitle === "string" &&
+    typeof value.foundItemId === "string" &&
+    typeof value.foundTitle === "string" &&
+    typeof value.foundPlace === "string" &&
+    typeof value.createdAt === "string" &&
+    typeof value.read === "boolean";
+}
+
 function parseNotifications(snapshot: string): { notifications: ItemNotification[]; error: string } {
   if (snapshot === STORAGE_ERROR) {
     return { notifications: [], error: "Браузер не разрешил доступ к уведомлениям." };
@@ -81,27 +160,12 @@ function parseNotifications(snapshot: string): { notifications: ItemNotification
   try {
     const parsed: unknown = JSON.parse(snapshot);
     if (!Array.isArray(parsed)) throw new Error();
-    const notifications = parsed.filter((value): value is ItemNotification =>
-      typeof value === "object" &&
-      value !== null &&
-      "id" in value &&
-      typeof value.id === "string" &&
-      "lostItemId" in value &&
-      typeof value.lostItemId === "string" &&
-      "lostTitle" in value &&
-      typeof value.lostTitle === "string" &&
-      "foundItemId" in value &&
-      typeof value.foundItemId === "string" &&
-      "foundTitle" in value &&
-      typeof value.foundTitle === "string" &&
-      "foundPlace" in value &&
-      typeof value.foundPlace === "string" &&
-      "createdAt" in value &&
-      typeof value.createdAt === "string" &&
-      "read" in value &&
-      typeof value.read === "boolean",
-    );
-    if (notifications.length !== parsed.length) throw new Error();
+    const notifications = parsed.map((value): ItemNotification => {
+      if (isOwnershipClaimNotification(value)) return value;
+      if (isItemSightingNotification(value)) return value;
+      if (isLegacyOrMatchNotification(value)) return { ...value, kind: "match" };
+      throw new Error();
+    });
     return { notifications, error: "" };
   } catch {
     return {
@@ -235,11 +299,12 @@ function useItemNotificationsClient(userId: string | null): ItemNotificationsSta
         )
         .filter((lostItem) => getSimilarFoundItems(lostItem, [foundItem]).length > 0)
         .filter((lostItem) => !current.notifications.some(
-          (notification) =>
+          (notification) => notification.kind === "match" &&
             notification.lostItemId === lostItem.id &&
             notification.foundItemId === foundItem.id,
         ))
-        .map((lostItem): ItemNotification => ({
+        .map((lostItem): ItemMatchNotification => ({
+          kind: "match",
           id: `${lostItem.id}:${foundItem.id}`,
           lostItemId: lostItem.id,
           lostTitle: lostItem.title,
@@ -274,6 +339,235 @@ function useItemNotificationsClient(userId: string | null): ItemNotificationsSta
           };
         }
       }
+    }
+
+    const queuedClaimIds = new Set<string>();
+
+    function addOwnershipClaimNotification(
+      claim: { id: string; itemId: string; message: string; createdAt: string },
+      items: Item[],
+      showBrowserNotification: boolean,
+    ) {
+      if (!active) return;
+      const item = items.find(
+        (storedItem) => storedItem.id === claim.itemId && storedItem.ownerId === activeUserId,
+      );
+      if (!item) return;
+
+      const current = parseNotifications(getNotificationSnapshot(activeUserId));
+      if (current.error) {
+        setSyncError(current.error);
+        return;
+      }
+      const notificationId = `ownership:${claim.id}`;
+      if (current.notifications.some((notification) => notification.id === notificationId)) return;
+
+      const notification: OwnershipClaimNotification = {
+        kind: "ownership_claim",
+        id: notificationId,
+        itemId: claim.itemId,
+        itemTitle: item.title,
+        message: claim.message,
+        createdAt: claim.createdAt,
+        read: false,
+      };
+      try {
+        writeNotifications(activeUserId, [notification, ...current.notifications].slice(0, 100));
+        setSyncError("");
+      } catch (writeError) {
+        setSyncError(
+          writeError instanceof Error ? writeError.message : "Не удалось сохранить уведомление.",
+        );
+        return;
+      }
+
+      if (showBrowserNotification && permission === "granted" && "Notification" in window) {
+        const browserNotification = new window.Notification(
+          "Новый запрос на подтверждение владельца",
+          {
+            body: `${item.title}: ${claim.message.slice(0, 180)}`,
+            icon: "/favicon.ico",
+            tag: notification.id,
+          },
+        );
+        browserNotification.onclick = () => {
+          window.focus();
+          router.push(`/item/${encodeURIComponent(claim.itemId)}`);
+          browserNotification.close();
+        };
+      }
+    }
+
+    function addSightingNotification(
+      sighting: {
+        id: string;
+        itemId: string;
+        userId: string;
+        latitude: number;
+        longitude: number;
+        observedAt: string;
+        comment: string;
+        createdAt: string;
+      },
+      items: Item[],
+      showBrowserNotification: boolean,
+    ) {
+      if (!active || sighting.userId === activeUserId) return;
+      const item = items.find(
+        (storedItem) =>
+          storedItem.id === sighting.itemId &&
+          storedItem.type === "lost" &&
+          storedItem.ownerId === activeUserId,
+      );
+      if (!item) return;
+
+      const current = parseNotifications(getNotificationSnapshot(activeUserId));
+      if (current.error) {
+        setSyncError(current.error);
+        return;
+      }
+      const notificationId = `sighting:${sighting.id}`;
+      if (current.notifications.some((notification) => notification.id === notificationId)) return;
+
+      const notification: ItemSightingNotification = {
+        kind: "sighting",
+        id: notificationId,
+        sightingId: sighting.id,
+        itemId: sighting.itemId,
+        itemTitle: item.title,
+        senderId: sighting.userId,
+        latitude: sighting.latitude,
+        longitude: sighting.longitude,
+        observedAt: sighting.observedAt,
+        comment: sighting.comment,
+        createdAt: sighting.createdAt,
+        read: false,
+      };
+      try {
+        writeNotifications(activeUserId, [notification, ...current.notifications].slice(0, 100));
+        setSyncError("");
+      } catch (writeError) {
+        setSyncError(
+          writeError instanceof Error
+            ? writeError.message
+            : "Не удалось сохранить уведомление о наблюдении.",
+        );
+        return;
+      }
+
+      if (showBrowserNotification && permission === "granted" && "Notification" in window) {
+        const browserNotification = new window.Notification(
+          `Новое наблюдение: ${item.title}`,
+          {
+            body: sighting.comment || `Отметка на карте · ${sighting.observedAt}`,
+            icon: "/favicon.ico",
+            tag: notification.id,
+          },
+        );
+        browserNotification.onclick = () => {
+          window.focus();
+          router.push(
+            `/item/${encodeURIComponent(sighting.itemId)}?sighting=${encodeURIComponent(sighting.id)}#item-sightings`,
+          );
+          browserNotification.close();
+        };
+      }
+    }
+
+    const queuedSightingIds = new Set<string>();
+
+    function onItemSightingInsert(payload: { new: Record<string, unknown> }) {
+      const {
+        id,
+        item_id: itemId,
+        user_id: senderId,
+        latitude,
+        longitude,
+        observed_at: observedAt,
+        comment,
+        created_at: createdAt,
+      } = payload.new;
+      const parsedLatitude = typeof latitude === "number" ? latitude : Number(latitude);
+      const parsedLongitude = typeof longitude === "number" ? longitude : Number(longitude);
+      if (
+        typeof id !== "string" ||
+        typeof itemId !== "string" ||
+        typeof senderId !== "string" ||
+        senderId === activeUserId ||
+        !Number.isFinite(parsedLatitude) ||
+        !Number.isFinite(parsedLongitude) ||
+        typeof observedAt !== "string" ||
+        typeof comment !== "string" ||
+        typeof createdAt !== "string" ||
+        queuedSightingIds.has(id)
+      ) {
+        return;
+      }
+
+      queuedSightingIds.add(id);
+      void getStoredItems()
+        .then((items) => {
+          addSightingNotification(
+            {
+              id,
+              itemId,
+              userId: senderId,
+              latitude: parsedLatitude,
+              longitude: parsedLongitude,
+              observedAt,
+              comment,
+              createdAt,
+            },
+            items,
+            true,
+          );
+        })
+        .catch((loadError: unknown) => {
+          if (active) {
+            queuedSightingIds.delete(id);
+            setSyncError(
+              loadError instanceof Error
+                ? loadError.message
+                : "Не удалось обработать новое наблюдение.",
+            );
+          }
+        });
+    }
+
+    function onOwnershipClaimInsert(payload: { new: Record<string, unknown> }) {
+      const { id, item_id: itemId, user_id: claimantId, message, created_at: createdAt } = payload.new;
+      if (
+        typeof id !== "string" ||
+        typeof itemId !== "string" ||
+        typeof claimantId !== "string" ||
+        claimantId === activeUserId ||
+        typeof message !== "string" ||
+        typeof createdAt !== "string" ||
+        payload.new.status !== "pending" ||
+        queuedClaimIds.has(id)
+      ) {
+        return;
+      }
+
+      queuedClaimIds.add(id);
+      void getStoredItems()
+        .then((items) => {
+          addOwnershipClaimNotification(
+            { id, itemId, message, createdAt },
+            items,
+            true,
+          );
+        })
+        .catch((loadError: unknown) => {
+          if (active) {
+            queuedClaimIds.delete(id);
+            setSyncError(
+              loadError instanceof Error
+                ? loadError.message
+                : "Не удалось обработать запрос подтверждения владельца.",
+            );
+          }
+        });
     }
 
     function onItemInsert(payload: { new: Record<string, unknown> }) {
@@ -317,6 +611,16 @@ function useItemNotificationsClient(userId: string | null): ItemNotificationsSta
         { event: "INSERT", schema: "public", table: "items" },
         onItemInsert,
       )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "ownership_claims" },
+        onOwnershipClaimInsert,
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "item_sightings" },
+        onItemSightingInsert,
+      )
       .subscribe((status, subscriptionError) => {
         if (!active) return;
         if (status === "SUBSCRIBED") {
@@ -338,7 +642,7 @@ function useItemNotificationsClient(userId: string | null): ItemNotificationsSta
       });
 
     void getStoredItems()
-      .then((items) => {
+      .then(async (items) => {
         if (!active) return;
         lostItems = items.filter(
           (item) => item.type === "lost" && item.status !== "returned",
@@ -347,6 +651,59 @@ function useItemNotificationsClient(userId: string | null): ItemNotificationsSta
           (item) => item.type === "found" && item.status !== "returned",
         );
         for (const foundItem of foundItems) addMatches(foundItem, false);
+
+        const ownerLostItemIds = items
+          .filter((item) => item.type === "lost" && item.ownerId === activeUserId)
+          .map((item) => item.id);
+        if (ownerLostItemIds.length) {
+          const { data: sightings, error: sightingsError } = await supabase
+            .from("item_sightings")
+            .select("id,item_id,user_id,latitude,longitude,observed_at,comment,created_at")
+            .in("item_id", ownerLostItemIds)
+            .order("created_at", { ascending: false })
+            .limit(100);
+          if (sightingsError) {
+            throw new Error(`Не удалось загрузить уведомления о наблюдениях: ${sightingsError.message}`);
+          }
+          for (const sighting of sightings ?? []) {
+            if (queuedSightingIds.has(sighting.id)) continue;
+            queuedSightingIds.add(sighting.id);
+            addSightingNotification({
+              id: sighting.id,
+              itemId: sighting.item_id,
+              userId: sighting.user_id,
+              latitude: Number(sighting.latitude),
+              longitude: Number(sighting.longitude),
+              observedAt: sighting.observed_at,
+              comment: sighting.comment,
+              createdAt: sighting.created_at,
+            }, items, false);
+          }
+        }
+
+        const ownerItemIds = items
+          .filter((item) => item.type === "found" && item.ownerId === activeUserId)
+          .map((item) => item.id);
+        if (!ownerItemIds.length) return;
+
+        const { data: claims, error: claimsError } = await supabase
+          .from("ownership_claims")
+          .select("id,item_id,user_id,message,created_at")
+          .eq("status", "pending")
+          .in("item_id", ownerItemIds);
+        if (claimsError) {
+          throw new Error(`Не удалось загрузить запросы владельца: ${claimsError.message}`);
+        }
+        for (const claim of claims ?? []) {
+          if (claim.user_id === activeUserId || queuedClaimIds.has(claim.id)) continue;
+          queuedClaimIds.add(claim.id);
+          addOwnershipClaimNotification({
+            id: claim.id,
+            itemId: claim.item_id,
+            message: claim.message,
+            createdAt: claim.created_at,
+          }, items, false);
+        }
       })
       .catch((loadError: unknown) => {
         if (active) {

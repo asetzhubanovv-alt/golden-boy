@@ -26,6 +26,7 @@ alter table public.conversations
   add column if not exists participant_1_last_read_at timestamptz not null default now(),
   add column if not exists participant_2_last_read_at timestamptz not null default now();
 alter table public.items add column if not exists price numeric(12,2);
+alter table public.items add column if not exists reward_amount bigint;
 
 do $$
 begin
@@ -36,6 +37,20 @@ begin
   ) then
     alter table public.items add constraint items_price_nonnegative_check
       check (price is null or price >= 0);
+  end if;
+end
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.items'::regclass
+      and conname = 'items_reward_amount_check'
+  ) then
+    alter table public.items add constraint items_reward_amount_check
+      check (reward_amount is null or
+        (type = 'lost' and reward_amount between 1 and 999999999999));
   end if;
 end
 $$;
@@ -125,13 +140,13 @@ grant update (username, full_name, avatar_url, bio, faculty, course, role, is_ve
 
 revoke select on public.items from anon, authenticated;
 revoke select (contact_method) on public.items from anon, authenticated;
-grant select (id, user_id, type, title, description, category, location, date, photos, price, status, created_at, updated_at)
+grant select (id, user_id, type, title, description, category, location, date, photos, price, reward_amount, status, created_at, updated_at)
   on public.items to anon, authenticated;
 revoke insert, update on public.items from authenticated;
 revoke insert (contact_method), update (contact_method) on public.items from authenticated;
-grant insert (id, user_id, type, title, description, category, location, date, photos, price, status)
+grant insert (id, user_id, type, title, description, category, location, date, photos, price, reward_amount, status)
   on public.items to authenticated;
-grant update (title, description, category, location, date, photos, price, status)
+grant update (title, description, category, location, date, photos, price, reward_amount, status)
   on public.items to authenticated;
 grant delete on public.items to authenticated;
 
@@ -391,9 +406,26 @@ create table if not exists public.chat_reports (
   constraint chat_reports_distinct_users check (reporter_id <> reported_user_id)
 );
 
+create table if not exists public.item_sightings (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references public.items(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  latitude double precision not null check (latitude between -90 and 90),
+  longitude double precision not null check (longitude between -180 and 180),
+  observed_at date not null,
+  comment text not null default '' check (char_length(comment) <= 1000),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists item_sightings_item_observed_at_idx
+  on public.item_sightings (item_id, observed_at desc, created_at desc);
+create index if not exists item_sightings_user_created_at_idx
+  on public.item_sightings (user_id, created_at desc);
+
 alter table public.chat_conversation_state enable row level security;
 alter table public.chat_user_blocks enable row level security;
 alter table public.chat_reports enable row level security;
+alter table public.item_sightings enable row level security;
 
 create or replace function public.is_chat_conversation_blocked(p_conversation_id uuid)
 returns boolean
@@ -475,6 +507,53 @@ grant select, insert, update, delete on public.chat_conversation_state to authen
 grant select, insert, delete on public.chat_user_blocks to authenticated;
 grant insert on public.chat_reports to authenticated;
 revoke all on public.chat_reports from anon;
+
+revoke all on public.item_sightings from public, anon, authenticated;
+grant select, insert on public.item_sightings to authenticated;
+
+drop policy if exists "Listing owners and reporters read item sightings"
+  on public.item_sightings;
+create policy "Listing owners and reporters read item sightings"
+  on public.item_sightings for select to authenticated
+  using (
+    public.is_active_user()
+    and exists (
+      select 1
+      from public.items i
+      where i.id = item_sightings.item_id
+        and i.type = 'lost'
+        and (
+          i.user_id = (select auth.uid())
+          or item_sightings.user_id = (select auth.uid())
+        )
+    )
+  );
+
+drop policy if exists "Active users report lost item sightings"
+  on public.item_sightings;
+create policy "Active users report lost item sightings"
+  on public.item_sightings for insert to authenticated
+  with check (
+    user_id = (select auth.uid())
+    and public.is_active_user()
+    and exists (
+      select 1
+      from public.items i
+      join public.profiles owner on owner.id = i.user_id
+      where i.id = item_sightings.item_id
+        and i.type = 'lost'
+        and i.status = 'active'
+        and i.user_id <> (select auth.uid())
+        and not owner.is_blocked
+    )
+  );
+
+do $$
+begin
+  alter publication supabase_realtime add table public.item_sightings;
+exception when duplicate_object then null;
+end
+$$;
 
 create or replace function public.set_chat_conversation_state(
   p_conversation_id uuid,

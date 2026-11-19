@@ -20,6 +20,7 @@ import { useStoredItems } from "@/lib/use-stored-items";
 import { deleteStoredItem, getAllItems, updateStoredItem, type Item } from "@/lib/items";
 import { getLostItemProgress, getSimilarFoundItems } from "@/lib/item-matching";
 import { useFavoriteItems } from "@/lib/use-favorite-items";
+import RewardAmountField from "@/components/reward-amount-field";
 
 type ProfileTab = "listings" | "favorites" | "settings";
 
@@ -57,6 +58,8 @@ export default function ProfilePage() {
     date: "",
     details: "",
     price: "",
+    rewardEnabled: false,
+    rewardAmount: "",
   });
   const [isSavingItemEdit, setIsSavingItemEdit] = useState(false);
 
@@ -218,6 +221,8 @@ export default function ProfilePage() {
       date: item.date ?? "",
       details: item.details,
       price: item.price == null ? "" : String(item.price),
+      rewardEnabled: item.type === "lost" && item.rewardAmount != null,
+      rewardAmount: item.rewardAmount == null ? "" : String(item.rewardAmount),
     });
   }
 
@@ -240,6 +245,10 @@ export default function ProfilePage() {
         date: editingItemForm.date,
         details: editingItemForm.details,
         price: editingItemForm.price.trim() ? Number(editingItemForm.price) : null,
+        rewardAmount:
+          editingItemForm.type === "lost" && editingItemForm.rewardEnabled
+            ? Number(editingItemForm.rewardAmount)
+            : null,
       });
       setMessage("Объявление обновлено.");
       setEditingItem(null);
@@ -524,7 +533,14 @@ export default function ProfilePage() {
                     <DialogContent>
                       <form className="item-edit-form" id="profile-edit-item-form" onSubmit={saveEditedItem}>
                         <label className="form-group"><span className="form-label">Название</span><input maxLength={80} onChange={(event) => setEditingItemForm((current) => ({ ...current, title: event.target.value }))} required value={editingItemForm.title} /></label>
-                        <label className="form-group"><span className="form-label">Тип объявления</span><select onChange={(event) => setEditingItemForm((current) => ({ ...current, type: event.target.value === "found" ? "found" : "lost" }))} value={editingItemForm.type}><option value="lost">Потерял</option><option value="found">Нашёл</option></select></label>
+                        <label className="form-group"><span className="form-label">Тип объявления</span><select onChange={(event) => { const type = event.target.value === "found" ? "found" : "lost"; setEditingItemForm((current) => ({ ...current, type, ...(type === "found" ? { rewardEnabled: false, rewardAmount: "" } : {}) })); }} value={editingItemForm.type}><option value="lost">Потерял</option><option value="found">Нашёл</option></select></label>
+                        <RewardAmountField
+                          amount={editingItemForm.rewardAmount}
+                          enabled={editingItemForm.rewardEnabled}
+                          itemType={editingItemForm.type}
+                          onAmountChange={(rewardAmount) => setEditingItemForm((current) => ({ ...current, rewardAmount }))}
+                          onEnabledChange={(rewardEnabled) => setEditingItemForm((current) => ({ ...current, rewardEnabled, rewardAmount: rewardEnabled ? current.rewardAmount : "" }))}
+                        />
                         <label className="form-group"><span className="form-label">Категория</span><select onChange={(event) => setEditingItemForm((current) => ({ ...current, category: event.target.value }))} required value={editingItemForm.category}>{["Документы", "Телефон", "Ключи", "Наушники", "Одежда", "Сумки", "Другое", "Электроника", "Книги"].map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
                         <label className="form-group"><span className="form-label">Место</span><input maxLength={120} onChange={(event) => setEditingItemForm((current) => ({ ...current, place: event.target.value }))} required value={editingItemForm.place} /></label>
                         <label className="form-group"><span className="form-label">Дата</span><input onChange={(event) => setEditingItemForm((current) => ({ ...current, date: event.target.value }))} required type="date" value={editingItemForm.date} /></label>
