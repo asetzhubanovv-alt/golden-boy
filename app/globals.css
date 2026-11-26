@@ -2359,11 +2359,30 @@ html[data-theme="dark"] {
 }
 
 .admin-stats article,
+.admin-stats > a,
 .admin-panel {
   padding: 20px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: #fff;
+}
+
+.admin-stat-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.admin-stat-link:hover {
+  border-color: var(--primary);
+  color: inherit;
+  transform: translateY(-2px);
+}
+
+.admin-stat-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
 }
 
 .admin-stats span,
@@ -2543,6 +2562,12 @@ html[data-theme="dark"] {
 
 .admin-actions {
   min-width: 420px;
+}
+
+.admin-page .MuiButton-root.Mui-disabled {
+  color: var(--primary) !important;
+  -webkit-text-fill-color: var(--primary) !important;
+  opacity: 1 !important;
 }
 
 .admin-list article > div {
@@ -7917,6 +7942,7 @@ html[data-theme="dark"] .select-field select {
 .profile-listing,
 .admin-list article,
 .admin-stats article,
+.admin-stats > a,
 .admin-panel,
 .about-stats article,
 .about-step-grid article,
@@ -8130,6 +8156,7 @@ html[data-theme="dark"] .select-field select {
 .auth-card,
 .profile-edit-card,
 .admin-stats article,
+.admin-stats > a,
 .admin-panel,
 .profile-listing {
   box-shadow: 0 8px 26px rgb(28 30 33 / 5%);
@@ -8194,6 +8221,7 @@ html[data-theme="dark"] .profile-edit-card,
 html[data-theme="dark"] .profile-listing,
 html[data-theme="dark"] .admin-list article,
 html[data-theme="dark"] .admin-stats article,
+html[data-theme="dark"] .admin-stats > a,
 html[data-theme="dark"] .admin-panel,
 html[data-theme="dark"] .about-stats article,
 html[data-theme="dark"] .about-step-grid article,
@@ -8390,6 +8418,7 @@ html[data-theme="dark"] .chat-message.is-own {
   html:not([data-theme="light"]) .profile-listing,
   html:not([data-theme="light"]) .admin-list article,
   html:not([data-theme="light"]) .admin-stats article,
+  html:not([data-theme="light"]) .admin-stats > a,
   html:not([data-theme="light"]) .admin-panel,
   html:not([data-theme="light"]) .about-stats article,
   html:not([data-theme="light"]) .about-step-grid article,

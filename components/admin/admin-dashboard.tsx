@@ -302,12 +302,12 @@ export default function AdminDashboard({ section }: { section: AdminSection }) {
                   {section === "overview" && (
                     <>
                       <div className="admin-stats">
-                        <article><span>{t("admin.stats.users")}</span><strong>{metrics.users}</strong></article>
-                        <article><span>{t("admin.stats.items")}</span><strong>{metrics.items}</strong></article>
-                        <article><span>{t("admin.stats.reports")}</span><strong>{metrics.reports}</strong></article>
-                        <article><span>{t("admin.stats.returned")}</span><strong>{metrics.returned}</strong></article>
-                        <article><span>{t("admin.stats.activeItems")}</span><strong>{metrics.activeItems}</strong></article>
-                        <article><span>{t("admin.stats.openReports")}</span><strong>{metrics.openReports}</strong></article>
+                        <Link className="admin-stat-link" href="/admin/users"><span>{t("admin.stats.users")}</span><strong>{metrics.users}</strong></Link>
+                        <Link className="admin-stat-link" href="/admin/listings"><span>{t("admin.stats.items")}</span><strong>{metrics.items}</strong></Link>
+                        <Link className="admin-stat-link" href="/admin/reports"><span>{t("admin.stats.reports")}</span><strong>{metrics.reports}</strong></Link>
+                        <Link className="admin-stat-link" href="/admin/listings"><span>{t("admin.stats.returned")}</span><strong>{metrics.returned}</strong></Link>
+                        <Link className="admin-stat-link" href="/admin/listings"><span>{t("admin.stats.activeItems")}</span><strong>{metrics.activeItems}</strong></Link>
+                        <Link className="admin-stat-link" href="/admin/reports"><span>{t("admin.stats.openReports")}</span><strong>{metrics.openReports}</strong></Link>
                       </div>
                       <section className="admin-panel">
                         <div className="admin-section-heading">
