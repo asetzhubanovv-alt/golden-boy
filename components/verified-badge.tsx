@@ -1,7 +1,13 @@
+"use client";
+
+import { useLanguage } from "@/components/language-provider";
+
 export default function VerifiedBadge({ size = 18 }: { size?: number }) {
+  const { t } = useLanguage();
+
   return (
     <svg
-      aria-label="Подтверждённый пользователь"
+      aria-label={t("accessibility.verifiedUser")}
       className="verified-badge"
       height={size}
       role="img"

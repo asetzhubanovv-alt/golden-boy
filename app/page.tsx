@@ -16,6 +16,7 @@ import {
 import { useStoredItems, useTodayDate } from "@/lib/use-stored-items";
 import { useLanguage } from "@/components/language-provider";
 import MapLocationPicker from "@/components/map-location-picker";
+import { localizeDemoItem } from "@/lib/localized-demo-items";
 
 type TimeFilter = "all" | "today" | "week";
 type StatusFilter = "all" | "searching" | "found" | "returned";
@@ -49,26 +50,6 @@ const DEFAULT_FILTERS: Filters = {
   status: "all",
   location: { address: "", latitude: null, longitude: null },
   radiusKm: 5,
-};
-
-type TextEntry = {
-  ru: string;
-  kk: string;
-  en: string;
-};
-
-type Item = {
-  id: string;
-  title: TextEntry;
-  categoryKey: string;
-  type: ItemType;
-  place: TextEntry;
-  daysAgo: number;
-  time: string;
-  status: "searching" | "found" | "returned";
-  art: string;
-  symbol: string;
-  details: TextEntry;
 };
 
 type TranslationSet = {
@@ -133,8 +114,11 @@ type TranslationSet = {
     returned: string;
     foundStatus: string;
     more: string;
+    rewardBadge: string;
+    verifiedUser: string;
     addFavorite: string;
     inFavorites: string;
+    removeFavorite: string;
   };
   emptyState: {
     message: string;
@@ -162,7 +146,7 @@ const categoryKeys = [
 const translations: Record<Language, TranslationSet> = {
   kk: {
     nav: {
-      feed: "Лента",
+      feed: "Хабарландырулар",
       about: "Біз туралы",
       login: "Кіру",
       publish: "Хабарландыру жариялау",
@@ -174,7 +158,7 @@ const translations: Record<Language, TranslationSet> = {
       reportLost: "Жоғалған зат туралы хабарлау",
     },
     promo: {
-      kicker: "FOUNDLY · ҚАУЫМДАСТЫҚ КӨМЕГІ",
+      kicker: "AMANAT · ҚАУЫМДАСТЫҚ КӨМЕГІ",
       title: "Жоғалттыңыз ба, әлде таптыңыз ба?",
       description: "Жоғалған және табылған заттар туралы хабарландыруларды бір жерден іздеңіз.",
       action: "Хабарландыруларды көру",
@@ -183,9 +167,9 @@ const translations: Record<Language, TranslationSet> = {
     filters: {
       categoryLabel: "Санат",
       allCategories: "Барлық санаттар",
-      allTypes: "Барлық хабарламалар",
+      allTypes: "Барлық хабарландырулар",
       lost: "Жоғалған",
-      found: "Табылды",
+      found: "Табылған",
       today: "Бүгін",
       week: "Апта",
       allTime: "Барлық уақыт",
@@ -202,10 +186,10 @@ const translations: Record<Language, TranslationSet> = {
       searching: "Ізделуде",
       foundStatus: "Табылды",
       returned: "Қайтарылды",
-      reset: "Фильтрлерді қалпына келтіру",
-      resultsFound: "Табылды",
-      resultSingular: "хабарлама",
-      resultPlural: "хабарлама",
+      reset: "Сүзгілерді тазарту",
+      resultsFound: "Нәтиже:",
+      resultSingular: "хабарландыру",
+      resultPlural: "хабарландыру",
     },
     sections: {
       title: "Хабарландырулар",
@@ -218,18 +202,21 @@ const translations: Record<Language, TranslationSet> = {
     card: {
       found: "ТАБЫЛДЫ",
       lost: "ЖОҒАЛДЫ",
-      ownerSearch: "Иесінің іздеуі",
+      ownerSearch: "Иесі ізделуде",
       returned: "Қайтарылды",
       foundStatus: "Табылды",
       more: "Толығырақ",
+      rewardBadge: "СЫЙАҚЫ",
+      verifiedUser: "Расталған пайдаланушы",
       addFavorite: "Таңдаулыларға",
       inFavorites: "Таңдаулыларда",
+      removeFavorite: "Таңдаулылардан алып тастау",
     },
     emptyState: {
-      message: "Сұранысты өзгертіп немесе фильтрлерді қайта орнатыңыз.",
+      message: "Іздеу сұрауын өзгертіп, сүзгілерді тазалап көріңіз.",
     },
     brand: {
-      homeLabel: "Foundly — негізгі бет",
+      homeLabel: "Amanat — негізгі бет",
     },
     language: "Тіл",
     categories: {
@@ -241,7 +228,7 @@ const translations: Record<Language, TranslationSet> = {
       clothes: "Киім",
       bags: "Сөмкелер",
       other: "Басқа",
-      electronics: "Электроника",
+      electronics: "Электр құрылғылары",
       books: "Кітаптар",
     },
   },
@@ -259,7 +246,7 @@ const translations: Record<Language, TranslationSet> = {
       reportLost: "Заявить о пропаже",
     },
     promo: {
-      kicker: "FOUNDLY · ПОМОЩЬ СООБЩЕСТВА",
+      kicker: "AMANAT · ПОМОЩЬ СООБЩЕСТВА",
       title: "Потерял или нашёл?",
       description: "Ищите потерянные вещи и сообщайте о находках в одном месте.",
       action: "Смотреть объявления",
@@ -307,14 +294,17 @@ const translations: Record<Language, TranslationSet> = {
       returned: "Возвращено",
       foundStatus: "Найдено",
       more: "Подробнее",
+      rewardBadge: "ВОЗНАГРАЖДЕНИЕ",
+      verifiedUser: "Подтверждённый пользователь",
       addFavorite: "В избранное",
       inFavorites: "В избранном",
+      removeFavorite: "Убрать из избранного",
     },
     emptyState: {
       message: "Попробуй изменить запрос или сбросить фильтры.",
     },
     brand: {
-      homeLabel: "Foundly — главная страница",
+      homeLabel: "Amanat — главная страница",
     },
     language: "Язык",
     categories: {
@@ -344,7 +334,7 @@ const translations: Record<Language, TranslationSet> = {
       reportLost: "Report a lost item",
     },
     promo: {
-      kicker: "FOUNDLY · COMMUNITY-POWERED",
+      kicker: "AMANAT · COMMUNITY-POWERED",
       title: "Lost or found something?",
       description: "Find lost items and share your discoveries, all in one place.",
       action: "Browse listings",
@@ -392,14 +382,17 @@ const translations: Record<Language, TranslationSet> = {
       returned: "Returned",
       foundStatus: "Found",
       more: "More details",
+      rewardBadge: "REWARD",
+      verifiedUser: "Verified user",
       addFavorite: "Save to favorites",
       inFavorites: "In favorites",
+      removeFavorite: "Remove from favorites",
     },
     emptyState: {
       message: "Try changing the search or resetting the filters.",
     },
     brand: {
-      homeLabel: "Foundly — home page",
+      homeLabel: "Amanat — home page",
     },
     language: "Language",
     categories: {
@@ -415,122 +408,6 @@ const translations: Record<Language, TranslationSet> = {
       books: "Books",
     },
   },
-};
-
-const localizedDemoItems: Item[] = [
-  {
-    id: "blue-headphones",
-    title: { ru: "Наушники Sony", kk: "Sony құлаққаптары", en: "Sony headphones" },
-    categoryKey: "electronics",
-    type: "lost",
-    place: { ru: "Библиотека, 2 этаж", kk: "Кітапхана, 2 қабат", en: "Library, 2nd floor" },
-    daysAgo: 0,
-    time: "12:40",
-    status: "searching",
-    art: "art-blue",
-    symbol: "♫",
-    details: {
-      ru: "Синие беспроводные наушники в чехле. Последний раз видел(а) в читальном зале.",
-      kk: "Көк, ұялы құлаққаптар корпустық қалтада. Соңғы рет оқу залында көрілді.",
-      en: "Blue wireless headphones in a case. Last seen in the reading room.",
-    },
-  },
-  {
-    id: "student-card",
-    title: { ru: "Студенческий билет", kk: "Студенттік билеті", en: "Student ID" },
-    categoryKey: "documents",
-    type: "found",
-    place: { ru: "Главный корпус, холл", kk: "Негізгі корпуc, холл", en: "Main building, lobby" },
-    daysAgo: 0,
-    time: "11:15",
-    status: "searching",
-    art: "art-peach",
-    symbol: "ID",
-    details: {
-      ru: "Нашёл(ла) студенческий билет у входа в главный корпус. Передал(а) на стойку охраны.",
-      kk: "Негізгі корпустың кіреберісінде студенттік билетті таптым. Қауіпсіздік пәтеріне тапсырдым.",
-      en: "Found a student ID by the main entrance. I left it at the security desk.",
-    },
-  },
-  {
-    id: "keychain",
-    title: { ru: "Связка ключей с брелоком", kk: "Кілттер жиынтығы", en: "Key ring with charm" },
-    categoryKey: "keys",
-    type: "found",
-    place: { ru: "Корпус Б, аудитория 204", kk: "Б корпусы, 204 аудитория", en: "Building B, room 204" },
-    daysAgo: 1,
-    time: "16:20",
-    status: "searching",
-    art: "art-green",
-    symbol: "✳",
-    details: {
-      ru: "Три ключа на кольце и небольшой зелёный брелок. Оставил(а) у охраны корпуса.",
-      kk: "Шеңбердегі үш кілт пен кішкентай жасыл брелок. Корпус күзетіне қалдырдым.",
-      en: "Three keys on a ring and a small green charm. Left with the building security.",
-    },
-  },
-  {
-    id: "black-backpack",
-    title: { ru: "Чёрный рюкзак", kk: "Қара рюкзак", en: "Black backpack" },
-    categoryKey: "bags",
-    type: "lost",
-    place: { ru: "Спортивный зал", kk: "Спорт залы", en: "Gym" },
-    daysAgo: 2,
-    time: "18:05",
-    status: "searching",
-    art: "art-lilac",
-    symbol: "▣",
-    details: {
-      ru: "Небольшой чёрный рюкзак с нашивкой. Внутри были конспекты и зарядка.",
-      kk: "Штамппен кішкентай қара рюкзак. Ішінде конспектілер мен зарядтау құрылғысы болды.",
-      en: "A small black backpack with a patch. It had notes and a charger inside.",
-    },
-  },
-  {
-    id: "chemistry-notes",
-    title: { ru: "Тетрадь по химии", kk: "Химия дәптері", en: "Chemistry notebook" },
-    categoryKey: "books",
-    type: "found",
-    place: { ru: "Кафетерий", kk: "Кафетерий", en: "Cafeteria" },
-    daysAgo: 3,
-    time: "13:30",
-    status: "returned",
-    art: "art-yellow",
-    symbol: "✎",
-    details: {
-      ru: "Клетчатая тетрадь с записями по органической химии. Уже ждёт владельца у администратора.",
-      kk: "Ұяшықты дәптер, органикалық химияға жазбалар бар. Әкімшілікке берілді, иесі күтуде.",
-      en: "A graph notebook with organic chemistry notes. It is waiting with the administrator.",
-    },
-  },
-  {
-    id: "silver-ring",
-    title: { ru: "Серебряное кольцо", kk: "Күміс сақина", en: "Silver ring" },
-    categoryKey: "other",
-    type: "found",
-    place: { ru: "Корпус А, аудитория 108", kk: "А корпусы, 108 аудитория", en: "Building A, room 108" },
-    daysAgo: 5,
-    time: "10:10",
-    status: "searching",
-    art: "art-rose",
-    symbol: "○",
-    details: {
-      ru: "Небольшое серебристое кольцо найдено после пары. Напишите, если это ваша вещь.",
-      kk: "Кішкентай күмістен жасалған сақина сабақтан кейін табылды. Егер сіздің болса, жазыңыз.",
-      en: "A small silver ring was found after class. Write if it’s yours.",
-    },
-  },
-];
-const categoryKeyByName: Record<string, string> = {
-  Электроника: "electronics",
-  Документы: "documents",
-  Телефон: "phone",
-  Ключи: "keys",
-  Наушники: "headphones",
-  Одежда: "clothes",
-  Сумки: "bags",
-  Книги: "books",
-  Другое: "other",
 };
 
 function Magnifier() {
@@ -592,13 +469,16 @@ export default function Home() {
               (todayDate.getTime() - itemDate.getTime()) / 86_400_000,
             )
           : item.daysAgo;
-      const localizedItem = localizedDemoItems.find((entry) => entry.id === item.id);
-      const titleText = (localizedItem?.title[language] ?? item.title).toLocaleLowerCase(language);
+      const localizedItem = localizeDemoItem(item, language);
+      const titleText = localizedItem.title.toLocaleLowerCase(language);
+      const categoryText = localizedItem.categoryKey
+        ? t.categories[localizedItem.categoryKey]
+        : item.category;
       const searchableText = [
         titleText,
-        localizedItem?.place[language] ?? item.place,
-        localizedItem?.details[language] ?? item.details,
-        item.category,
+        localizedItem.place,
+        localizedItem.details,
+        categoryText,
       ];
       const matchesQuery =
         !normalizedQuery ||
@@ -611,7 +491,7 @@ export default function Home() {
         (filters.status === "found"
           ? item.type === "found"
           : item.status === filters.status);
-      const itemCategory = localizedItem?.categoryKey ?? categoryKeyByName[item.category];
+      const itemCategory = localizedItem.categoryKey;
       const matchesCategory = filters.category === "all" || itemCategory === filters.category;
       const matchesTime =
         filters.time === "all" ||
@@ -639,7 +519,7 @@ export default function Home() {
         matchesLocation
       );
     });
-  }, [filters, items, language, query, today]);
+  }, [filters, items, language, query, t.categories, today]);
   const pageCount = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
   const activePage = Math.min(currentPage, Math.max(pageCount, 1));
   const visibleItems = filteredItems.slice(
@@ -692,7 +572,7 @@ export default function Home() {
     <main className="foundly-shell container-fluid px-0">
       <SiteHeader active="feed" />
 
-      <section aria-label="Foundly" className="foundly-promo">
+      <section aria-label="Amanat" className="foundly-promo">
         <div className="foundly-promo-inner container">
           <div className="foundly-promo-copy">
             <span className="foundly-promo-kicker">{t.promo.kicker}</span>
@@ -707,7 +587,7 @@ export default function Home() {
             <span className="foundly-promo-orbit foundly-promo-orbit-outer" />
             <span className="foundly-promo-orbit foundly-promo-orbit-inner" />
             <div className="foundly-promo-art-content">
-              <span className="foundly-promo-wordmark">foundly</span>
+              <span className="foundly-promo-wordmark">Amanat</span>
               <span className="foundly-promo-art-title">{t.promo.creativeTitle}</span>
             </div>
           </div>
@@ -971,20 +851,16 @@ export default function Home() {
         {filteredItems.length > 0 ? (
           <div className="row g-4 item-grid">
             {visibleItems.map((item) => {
-              const localizedItem = localizedDemoItems.find((entry) => entry.id === item.id);
-              const title = localizedItem?.title[language] ?? item.title;
-              const place = localizedItem?.place[language] ?? item.place;
-              const details = localizedItem?.details[language] ?? item.details;
-              const itemCategory = localizedItem?.categoryKey ?? categoryKeyByName[item.category];
+              const localizedItem = localizeDemoItem(item, language);
 
               return (
                 <div className="col-12 col-sm-6 col-lg-4 col-xl-3" key={item.id}>
                   <ListingCard
                     item={item}
-                    title={title}
-                    place={place}
-                    details={details}
-                    category={itemCategory ? t.categories[itemCategory] : item.category}
+                    title={localizedItem.title}
+                    place={localizedItem.place}
+                    details={localizedItem.details}
+                    category={localizedItem.categoryKey ? t.categories[localizedItem.categoryKey] : item.category}
                     dateLabel={formatItemDate(item.daysAgo, item.time, language)}
                     labels={t.card}
                     isFavorite={favoriteIds.includes(item.id)}

@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { getStoredItems, type Item } from "@/lib/items";
 import { getSupabaseClient } from "@/lib/supabase";
+import { useLanguage } from "@/components/language-provider";
+import { localizedError, translate } from "@/lib/messages";
 
 export function useStoredItems(): {
   items: Item[];
   error: string;
   isReady: boolean;
 } {
+  const { language } = useLanguage();
   const [items, setItems] = useState<Item[]>([]);
   const [error, setError] = useState("");
   const [isReady, setIsReady] = useState(false);
@@ -19,15 +22,11 @@ export function useStoredItems(): {
       setItems(currentItems);
       setError("");
     } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Не удалось загрузить объявления.",
-      );
+      setError(localizedError(language, loadError, "items.error.load"));
     } finally {
       setIsReady(true);
     }
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     let active = true;
@@ -40,11 +39,7 @@ export function useStoredItems(): {
         }
       } catch (loadError) {
         if (active) {
-          setError(
-            loadError instanceof Error
-              ? loadError.message
-              : "Не удалось загрузить объявления.",
-          );
+          setError(localizedError(language, loadError, "items.error.load"));
         }
       } finally {
         if (active) setIsReady(true);
@@ -69,7 +64,7 @@ export function useStoredItems(): {
           )
           .subscribe((status) => {
             if (status === "CHANNEL_ERROR" && active) {
-              setError("Не удалось подключить обновления объявлений в реальном времени.");
+            setError(translate(language, "items.error.realtime"));
             }
           });
         removeChannel = () => {
@@ -78,11 +73,7 @@ export function useStoredItems(): {
       })
       .catch((connectionError: unknown) => {
         if (!active) return;
-        setError(
-          connectionError instanceof Error
-            ? connectionError.message
-            : "Не удалось подключиться к Supabase.",
-        );
+        setError(localizedError(language, connectionError, "items.error.connect"));
         setIsReady(true);
       });
 
@@ -91,7 +82,7 @@ export function useStoredItems(): {
       window.removeEventListener("foundly-items-updated", onItemsChanged);
       removeChannel();
     };
-  }, [refresh]);
+  }, [language, refresh]);
 
   return {
     items,

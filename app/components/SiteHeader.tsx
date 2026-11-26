@@ -4,11 +4,11 @@ export function SiteHeader() {
   return (
     <header className="site-header">
       <nav className="container site-nav" aria-label="Основная навигация">
-        <Link className="brand" href="/" aria-label="Foundly — главная">
+        <Link className="brand" href="/" aria-label="Amanat — главная">
           <span className="brand-mark" aria-hidden="true">
-            f
+            A
           </span>
-          <span>foundly</span>
+          <span>Amanat</span>
         </Link>
         <nav className="main-nav" aria-label="Основная навигация">
           <Link className="nav-link active" href="/">

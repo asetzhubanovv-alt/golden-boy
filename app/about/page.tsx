@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import AboutContent from "@/components/about-content";
 
 export const metadata: Metadata = {
-  title: "О нас — Foundly",
+  title: "Біз туралы — Amanat",
   description:
-    "Как пользоваться университетской доской потерянных и найденных вещей, правила публикации и ответы на вопросы.",
+    "Университет қауымдастығында жоғалған және табылған заттарды іздеу, хабарландыру жариялау ережелері мен жауаптар.",
   openGraph: {
-    title: "О нас — Foundly",
-    description: "Помогаем вещам возвращаться к своим владельцам.",
+    title: "Біз туралы — Amanat",
+    description: "Заттардың иесіне қайта оралуына көмектесеміз.",
     type: "website",
   },
 };

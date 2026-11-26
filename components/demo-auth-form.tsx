@@ -9,13 +9,14 @@ import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
 import { loginDemoUser, registerDemoUser } from "@/lib/demo-auth";
 import { useLanguage } from "@/components/language-provider";
+import { localizedError } from "@/lib/messages";
 
 type DemoAuthFormProps = {
   mode: "login" | "register";
 };
 
 export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRegister = mode === "register";
@@ -61,9 +62,7 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
       router.replace(redirectPath);
     } catch (authError) {
       setError(
-        authError instanceof Error
-          ? authError.message
-          : t("auth.fallbackError"),
+        localizedError(language, authError, "auth.fallbackError"),
       );
       setIsSubmitting(false);
     }
@@ -75,9 +74,9 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
 
       <section className="auth-page">
         <div className="auth-card">
-          <Link className="auth-brand" href="/" aria-label="Foundly — главная">
-            <span className="brand-mark">f</span>
-            <span>foundly</span>
+          <Link className="auth-brand" href="/" aria-label="Amanat">
+            <span className="brand-mark">A</span>
+            <span>Amanat</span>
           </Link>
 
           <span className="section-kicker">{t("auth.kicker")}</span>
@@ -90,7 +89,7 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
 
           {error && (
             <Alert className="form-error" severity="error">
-              {error}
+              {localizedError(language, error, "auth.fallbackError")}
             </Alert>
           )}
           {success && <Alert severity="success">{success}</Alert>}

@@ -11,11 +11,12 @@ import { useLanguage } from "@/components/language-provider";
 import { getProfileByUsername, getProfileItems, isValidUsername, type Profile } from "@/lib/profiles";
 import type { Item } from "@/lib/items";
 import { useDemoAuth } from "@/lib/use-demo-auth";
+import { localizedError } from "@/lib/messages";
 
 type ProfileItem = Item & { status: "searching" | "found" | "returned" };
 
 export default function PublicProfilePage({ username }: { username: string }) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const { user } = useDemoAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [items, setItems] = useState<ProfileItem[]>([]);
@@ -44,11 +45,11 @@ export default function PublicProfilePage({ username }: { username: string }) {
         if (active) setItems(profileItems as unknown as ProfileItem[]);
       })
       .catch((loadError: unknown) => {
-        if (active) setError(loadError instanceof Error ? loadError.message : t("publicProfile.loadError"));
+        if (active) setError(localizedError(language, loadError, "publicProfile.loadError"));
       })
       .finally(() => { if (active) setReady(true); });
     return () => { active = false; };
-  }, [t, username]);
+  }, [language, t, username]);
 
   const visibleItems = items.filter((item) =>
     tab === "found" ? item.type === "found" : tab === "returned" ? item.status === "returned" : true,
@@ -70,7 +71,7 @@ export default function PublicProfilePage({ username }: { username: string }) {
               <div>
                 <span className="profile-username">@{profile.username} {profile.is_verified && <VerifiedBadge />}</span>
                 <h1>{profile.full_name || profile.username}</h1>
-                {profile.role === "admin" && <span className="admin-badge">Admin</span>}
+                {profile.role === "admin" && <span className="admin-badge">{t("admin.role.admin")}</span>}
                 {profile.bio && <p>{profile.bio}</p>}
                 {(profile.faculty || profile.course) && <p>{[profile.faculty, profile.course ? `${profile.course} ${t("publicProfile.course")}` : ""].filter(Boolean).join(" · ")}</p>}
                 {user?.id !== profile.id && (
@@ -88,7 +89,7 @@ export default function PublicProfilePage({ username }: { username: string }) {
               <button aria-selected={tab === "found"} onClick={() => setTab("found")} role="tab">{t("publicProfile.found")}</button>
               <button aria-selected={tab === "returned"} onClick={() => setTab("returned")} role="tab">{t("publicProfile.returned")}</button>
             </div>
-            {error && <Alert severity="error">{error}</Alert>}
+            {error && <Alert severity="error">{localizedError(language, error, "publicProfile.loadError")}</Alert>}
             {visibleItems.length ? <div className="profile-listings">{visibleItems.map((item) => (
               <Link className="profile-listing" href={`/item/${encodeURIComponent(item.id)}`} key={item.id}>
                 <strong>{item.title}</strong><span>{item.place}</span><small>{item.status === "returned" ? t("publicProfile.returned") : item.type === "found" ? t("publicProfile.foundStatus") : t("publicProfile.searching")}</small>

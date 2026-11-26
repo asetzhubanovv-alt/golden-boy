@@ -9,6 +9,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useDemoAuth } from "@/lib/use-demo-auth";
+import { useLanguage } from "@/components/language-provider";
+import { localizedError } from "@/lib/messages";
 import {
   getFavoritesSnapshot,
   mergeGuestFavorites,
@@ -28,6 +30,7 @@ type FavoritesContextValue = {
 const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
+  const { language } = useLanguage();
   const { user, isReady: authReady } = useDemoAuth();
   const userId = authReady ? user?.id ?? null : null;
   const getSnapshot = useMemo(
@@ -88,7 +91,9 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     <FavoritesContext.Provider
       value={{
         favoriteIds,
-        error: snapshotError || actionError,
+        error: snapshotError || actionError
+          ? localizedError(language, snapshotError || actionError, "favorites.error.general")
+          : "",
         isReady: authReady && snapshot !== SERVER_FAVORITES_SNAPSHOT,
         toggleFavorite,
       }}

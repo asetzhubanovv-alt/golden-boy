@@ -10,6 +10,7 @@ import { useFavorites } from "@/components/favorites-provider";
 import { useLanguage } from "@/components/language-provider";
 import { formatItemDate, getAllItems } from "@/lib/items";
 import { useStoredItems } from "@/lib/use-stored-items";
+import { localizeDemoItem } from "@/lib/localized-demo-items";
 
 export default function FavoritesPage() {
   const { language, t } = useLanguage();
@@ -58,31 +59,37 @@ export default function FavoritesPage() {
           </div>
         ) : (
           <div className="row g-4 item-grid">
-            {favorites.map((item) => (
-              <div className="col-12 col-sm-6 col-lg-4 col-xl-3" key={item.id}>
-                <ListingCard
-                  item={item}
-                  title={item.title}
-                  place={item.place}
-                  details={item.details}
-                  category={item.category}
-                  dateLabel={formatItemDate(item.daysAgo, item.time, language)}
-                  labels={{
-                    lost: t("detail.lost"),
-                    found: t("detail.found"),
-                    returned: t("status.returned"),
-                    foundStatus: t("status.found"),
-                    ownerSearch: t("status.searching"),
-                    more: t("feed.more"),
-                    addFavorite: t("favorites.add"),
-                    inFavorites: t("favorites.inFavorites"),
-                  }}
-                  isFavorite
-                  favoritesReady={isReady}
-                  onToggleFavorite={toggleFavorite}
-                />
-              </div>
-            ))}
+            {favorites.map((item) => {
+              const localizedItem = localizeDemoItem(item, language);
+              return (
+                <div className="col-12 col-sm-6 col-lg-4 col-xl-3" key={item.id}>
+                  <ListingCard
+                    item={item}
+                    title={localizedItem.title}
+                    place={localizedItem.place}
+                    details={localizedItem.details}
+                    category={localizedItem.categoryKey ? t(`category.${localizedItem.categoryKey}`) : item.category}
+                    dateLabel={formatItemDate(item.daysAgo, item.time, language)}
+                    labels={{
+                      lost: t("detail.lost"),
+                      found: t("detail.found"),
+                      returned: t("status.returned"),
+                      foundStatus: t("status.found"),
+                      ownerSearch: t("status.searching"),
+                      more: t("feed.more"),
+                      rewardBadge: t("detail.rewardBadge"),
+                      verifiedUser: t("accessibility.verifiedUser"),
+                      addFavorite: t("favorites.add"),
+                      inFavorites: t("favorites.inFavorites"),
+                      removeFavorite: t("favorites.remove"),
+                    }}
+                    isFavorite
+                    favoritesReady={isReady}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

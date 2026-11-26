@@ -7,7 +7,7 @@ export default function SiteFooter() {
   return (
     <footer className="site-footer container">
       <Link className="footer-brand" href="/">
-        foundly<span>.</span>
+        Amanat<span>.</span>
       </Link>
       <Link href="/about">{t("nav.about")}</Link>
     </footer>

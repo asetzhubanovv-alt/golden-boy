@@ -5,6 +5,7 @@ import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Link from "next/link";
 import { useLanguage } from "@/components/language-provider";
+import { localizedError } from "@/lib/messages";
 import {
   createOwnershipClaim,
   getOwnershipClaims,
@@ -27,7 +28,7 @@ export default function OwnershipVerification({
   isClosed,
   userId,
 }: OwnershipVerificationProps) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const isOwner = userId === ownerId;
   const [claims, setClaims] = useState<OwnershipClaim[]>([]);
   const [message, setMessage] = useState("");
@@ -47,11 +48,11 @@ export default function OwnershipVerification({
     try {
       setClaims(await getOwnershipClaims(itemId));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить запросы.");
+      setError(localizedError(language, loadError, "ownership.error.load"));
     } finally {
       setIsLoading(false);
     }
-  }, [itemId, userId]);
+  }, [itemId, language, userId]);
 
   useEffect(() => {
     const task = window.setTimeout(() => void loadClaims(), 0);
@@ -63,9 +64,9 @@ export default function OwnershipVerification({
     return subscribeToOwnershipClaims(
       itemId,
       () => void loadClaims(),
-      setError,
+      (error) => setError(localizedError(language, error, "ownership.error.load")),
     );
-  }, [itemId, loadClaims, userId]);
+  }, [itemId, language, loadClaims, userId]);
 
   const ownClaims = claims.filter((claim) => claim.user_id === userId);
   const hasPendingClaim = ownClaims.some((claim) => claim.status === "pending");
@@ -82,7 +83,7 @@ export default function OwnershipVerification({
       setMessage("");
       await loadClaims();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Не удалось отправить запрос.");
+      setError(localizedError(language, submitError, "ownership.error.send"));
     } finally {
       setIsSaving(false);
     }
@@ -98,7 +99,7 @@ export default function OwnershipVerification({
       await updateOwnershipClaimStatus(claimId, status);
       await loadClaims();
     } catch (reviewError) {
-      setError(reviewError instanceof Error ? reviewError.message : "Не удалось обновить статус запроса.");
+      setError(localizedError(language, reviewError, "ownership.error.update"));
     } finally {
       setIsSaving(false);
     }

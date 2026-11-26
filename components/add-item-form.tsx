@@ -23,7 +23,7 @@ import {
   type ItemLocation,
   type ItemType,
 } from "@/lib/items";
-import { categoryTranslationKey } from "@/lib/messages";
+import { categoryTranslationKey, localizedError } from "@/lib/messages";
 import { useTodayDate } from "@/lib/use-stored-items";
 import { useDemoAuth } from "@/lib/use-demo-auth";
 import RewardAmountField from "@/components/reward-amount-field";
@@ -98,7 +98,7 @@ export default function AddItemForm({
     setImageError("");
     if (!files.length) return;
     if (files.length > MAX_IMAGES) {
-      setImageError(`Можно добавить не более ${MAX_IMAGES} фотографий.`);
+      setImageError(t("form.error.maxImages").replace("{count}", String(MAX_IMAGES)));
       event.target.value = "";
       return;
     }
@@ -128,9 +128,7 @@ export default function AddItemForm({
       setImageDataUrls([]);
       setImageNames([]);
       setImageError(
-        imageReadError instanceof Error
-          ? imageReadError.message
-          : t("form.error.uploadImage"),
+        localizedError(language, imageReadError, "form.error.uploadImage"),
       );
     }
   }
@@ -139,7 +137,7 @@ export default function AddItemForm({
     event.preventDefault();
     setError("");
     if (!user) {
-      setError("Войди или зарегистрируйся, чтобы опубликовать объявление.");
+      setError(t("form.error.loginRequired"));
       return;
     }
     const selectedDate = date || today;
@@ -159,15 +157,15 @@ export default function AddItemForm({
       return;
     }
     if (!location.address.trim()) {
-      setError("Выбери место на карте или найди его по адресу.");
+      setError(t("form.error.locationRequired"));
       return;
     }
     if (location.address.trim().length > 120) {
-      setError("Адрес должен содержать не более 120 символов.");
+      setError(t("form.error.addressTooLong"));
       return;
     }
     if (location.latitude === null || location.longitude === null) {
-      setError("Найди адрес через поиск или выбери точку на карте.");
+      setError(t("form.error.locationPointRequired"));
       return;
     }
 
@@ -200,11 +198,7 @@ export default function AddItemForm({
       router.push(`/item/${itemId}`);
     } catch (saveError) {
       setIsSaving(false);
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : t("form.error.save"),
-      );
+      setError(localizedError(language, saveError, "form.error.save"));
     }
   }
 
@@ -228,7 +222,7 @@ export default function AddItemForm({
           <span className="section-kicker">{t("form.authKicker")}</span>
           <h1>{t("form.authTitle")}</h1>
           <p>{t("form.authDescription")}</p>
-          {authError && <Alert severity="error">{authError}</Alert>}
+          {authError && <Alert severity="error">{localizedError(language, authError, "form.error.loginRequired")}</Alert>}
           <div className="auth-required-actions">
             <Button
               className="detail-primary-button"
@@ -269,7 +263,7 @@ export default function AddItemForm({
           <form className="item-form" onSubmit={handleSubmit}>
             {error && (
               <Alert className="form-error" severity="error">
-                {error}
+                {localizedError(language, error, "form.error.save")}
               </Alert>
             )}
 
@@ -340,13 +334,14 @@ export default function AddItemForm({
                   <option disabled value="">
                     {t("form.chooseCategory")}
                   </option>
-                  {ITEM_CATEGORIES.map((itemCategory) => (
-                    <option key={itemCategory} value={itemCategory}>
-                      {categoryTranslationKey(itemCategory)
-                        ? t(categoryTranslationKey(itemCategory)!)
-                        : itemCategory}
-                    </option>
-                  ))}
+                  {ITEM_CATEGORIES.map((itemCategory) => {
+                    const categoryKey = categoryTranslationKey(itemCategory);
+                    return (
+                      <option key={itemCategory} value={itemCategory}>
+                        {categoryKey ? t(categoryKey) : itemCategory}
+                      </option>
+                    );
+                  })}
                 </select>
               </label>
             </div>
@@ -425,7 +420,7 @@ export default function AddItemForm({
                 )}
                 <span className="upload-copy">
                   <strong>{imageNames.join(", ") || t("form.addPhoto")}</strong>
-                  <small>JPG, PNG или WebP · до 5 МБ каждое · максимум 3 фото</small>
+                  <small>{t("form.photoTypes")} · {t("form.error.maxImages").replace("{count}", String(MAX_IMAGES))}</small>
                 </span>
                 <span className="upload-browse">{t("form.chooseFile")}</span>
               </label>

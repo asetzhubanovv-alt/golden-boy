@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import AddItemForm from "@/components/add-item-form";
+import LocalizedLoading from "@/components/localized-loading";
 
 export default function AddItemPage({
   searchParams,
@@ -9,11 +10,11 @@ export default function AddItemPage({
   return (
     <Suspense
       fallback={
-        <main className="foundly-shell container-fluid px-0">
-          <section className="auth-required-state container">
-            <p>Загружаем форму объявления...</p>
-          </section>
-        </main>
+        <LocalizedLoading
+          className="auth-required-state container"
+          translationKey="route.loading.add"
+          wrapperClassName="foundly-shell container-fluid px-0"
+        />
       }
     >
       <AddItemForm searchParams={searchParams} />

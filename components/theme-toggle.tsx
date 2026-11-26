@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import { useLanguage } from "@/components/language-provider";
 
 type Theme = "light" | "dark";
 const THEME_EVENT = "foundly-theme-updated";
@@ -22,6 +23,8 @@ function subscribe(callback: () => void) {
 
 export default function ThemeToggle() {
   const theme = useSyncExternalStore(subscribe, getTheme, () => "light");
+  const { t } = useLanguage();
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
@@ -35,7 +38,7 @@ export default function ThemeToggle() {
 
   return (
     <button
-      aria-label={theme === "dark" ? "Включить светлую тему" : "Включить тёмную тему"}
+      aria-label={theme === "dark" ? t("theme.enableLight") : t("theme.enableDark")}
       className="theme-toggle"
       onClick={toggleTheme}
       type="button"

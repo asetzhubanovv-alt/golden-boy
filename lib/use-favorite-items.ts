@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useState, useSyncExternalStore } from "react";
+import { useLanguage } from "@/components/language-provider";
+import { localizedError, translate } from "@/lib/messages";
 
 const FAVORITES_EVENT = "foundly-favorites-updated";
 const STORAGE_ERROR = "__foundly_favorites_storage_error__";
@@ -43,6 +45,7 @@ function parseFavoriteIds(snapshot: string): { ids: string[]; error: string } {
 }
 
 export function useFavoriteItems(userId: string | null) {
+  const { language } = useLanguage();
   const [actionError, setActionError] = useState("");
   const snapshot = useSyncExternalStore(
     subscribe,
@@ -53,7 +56,7 @@ export function useFavoriteItems(userId: string | null) {
 
   const toggleFavorite = useCallback((itemId: string) => {
     if (!userId) {
-      setActionError("Войдите в аккаунт, чтобы сохранять объявления.");
+      setActionError(translate(language, "favorites.error.loginRequired"));
       return;
     }
     try {
@@ -66,9 +69,15 @@ export function useFavoriteItems(userId: string | null) {
       setActionError("");
       window.dispatchEvent(new Event(FAVORITES_EVENT));
     } catch (writeError) {
-      setActionError(writeError instanceof Error ? writeError.message : "Не удалось сохранить избранное.");
+      setActionError(localizedError(language, writeError, "favorites.error.general"));
     }
-  }, [userId]);
+  }, [language, userId]);
 
-  return { favoriteIds, toggleFavorite, error: snapshotError || actionError };
+  return {
+    favoriteIds,
+    toggleFavorite,
+    error: snapshotError || actionError
+      ? localizedError(language, snapshotError || actionError, "favorites.error.general")
+      : "",
+  };
 }

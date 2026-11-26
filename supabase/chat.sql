@@ -432,11 +432,14 @@ create table if not exists public.item_sightings (
   longitude double precision not null check (longitude between -180 and 180),
   observed_at date not null,
   comment text not null default '' check (char_length(comment) <= 1000),
+  photo_path text,
   created_at timestamptz not null default now()
 );
 
 alter table public.item_sightings
   add column if not exists address text not null default '';
+alter table public.item_sightings
+  add column if not exists photo_path text;
 
 do $$
 begin
@@ -580,6 +583,13 @@ create policy "Active users report lost item sightings"
         and i.status = 'active'
         and i.user_id <> (select auth.uid())
         and not owner.is_blocked
+    )
+    and (
+      photo_path is null
+      or photo_path ~ (
+        '^' || item_id::text || '/' || (select auth.uid())::text || '/'
+        || id::text || '\.(jpg|png|webp)$'
+      )
     )
   );
 
@@ -771,13 +781,21 @@ end;
 $$;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'chat-attachments',
-  'chat-attachments',
-  false,
-  10485760,
-  array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-)
+values
+  (
+    'chat-attachments',
+    'chat-attachments',
+    false,
+    10485760,
+    array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+  ),
+  (
+    'sighting-photos',
+    'sighting-photos',
+    false,
+    5242880,
+    array['image/jpeg', 'image/png', 'image/webp']
+  )
 on conflict (id) do update set
   public = excluded.public,
   file_size_limit = excluded.file_size_limit,
@@ -814,6 +832,57 @@ create policy "Users delete their chat attachments"
   on storage.objects for delete to authenticated
   using (
     bucket_id = 'chat-attachments'
+    and (storage.foldername(name))[2] = (select auth.uid())::text
+  );
+
+drop policy if exists "Sighting participants read private photos" on storage.objects;
+create policy "Sighting participants read private photos"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'sighting-photos'
+    and public.is_active_user()
+    and (
+      (storage.foldername(name))[2] = (select auth.uid())::text
+      or exists (
+        select 1
+        from public.item_sightings s
+        join public.items i on i.id = s.item_id
+        where s.photo_path = name
+          and (storage.foldername(name))[2] = s.user_id::text
+          and i.type = 'lost'
+          and (
+            i.user_id = (select auth.uid())
+            or s.user_id = (select auth.uid())
+          )
+      )
+    )
+  );
+
+drop policy if exists "Active users upload sighting photos" on storage.objects;
+create policy "Active users upload sighting photos"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'sighting-photos'
+    and (storage.foldername(name))[2] = (select auth.uid())::text
+    and storage.filename(name) ~* '^[0-9a-f-]{36}\.(jpg|png|webp)$'
+    and public.is_active_user()
+    and exists (
+      select 1
+      from public.items i
+      join public.profiles owner on owner.id = i.user_id
+      where i.id::text = (storage.foldername(name))[1]
+        and i.type = 'lost'
+        and i.status = 'active'
+        and i.user_id <> (select auth.uid())
+        and not owner.is_blocked
+    )
+  );
+
+drop policy if exists "Users delete their sighting photos" on storage.objects;
+create policy "Users delete their sighting photos"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'sighting-photos'
     and (storage.foldername(name))[2] = (select auth.uid())::text
   );
 

@@ -19,9 +19,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Foundly — потерял или нашёл",
+  title: "Amanat — жоғалған және табылған заттар",
   description:
-    "Объявления о потерянных и найденных вещах в университетском сообществе.",
+    "Университет қауымдастығындағы жоғалған және табылған заттар туралы хабарландырулар.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -32,16 +32,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ItemNotificationsProvider>
-          <LanguageProvider>
+        <LanguageProvider>
+          <ItemNotificationsProvider>
             <FavoritesProvider>
               <Suspense fallback={null}>
                 <RouteScrollToTop />
               </Suspense>
               {children}
             </FavoritesProvider>
-          </LanguageProvider>
-        </ItemNotificationsProvider>
+          </ItemNotificationsProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

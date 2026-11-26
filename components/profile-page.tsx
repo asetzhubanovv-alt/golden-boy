@@ -7,6 +7,7 @@ import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import SiteFooter from "@/components/site-footer";
@@ -23,6 +24,8 @@ import { useFavoriteItems } from "@/lib/use-favorite-items";
 import RewardAmountField from "@/components/reward-amount-field";
 import { useLanguage } from "@/components/language-provider";
 import { getMyItemSightings, type ItemSighting } from "@/lib/sightings";
+import { categoryTranslationKey, localizedError } from "@/lib/messages";
+import { localizeDemoItem } from "@/lib/localized-demo-items";
 
 type ProfileTab = "listings" | "favorites" | "sightings" | "settings";
 
@@ -110,12 +113,12 @@ export default function ProfilePage() {
       setFaculty(currentProfile.faculty);
       setCourse(currentProfile.course?.toString() ?? "");
     }).catch((loadError: unknown) => {
-      if (active) setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить профиль.");
+      if (active) setError(localizedError(language, loadError, "profile.error.load"));
     }).finally(() => {
       if (active) setProfileLoading(false);
     });
     return () => { active = false; };
-  }, [user]);
+  }, [language, user]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -137,9 +140,7 @@ export default function ProfilePage() {
             userId,
             sightings: [],
             error:
-              loadError instanceof Error
-                ? loadError.message
-                : t("profile.sightings.loadError"),
+              localizedError(language, loadError, "profile.sightings.loadError"),
           });
         }
       });
@@ -147,7 +148,7 @@ export default function ProfilePage() {
     return () => {
       active = false;
     };
-  }, [t, user?.id]);
+  }, [language, t, user?.id]);
 
   const completedFields = [
     username.trim(),
@@ -164,7 +165,7 @@ export default function ProfilePage() {
   function onAvatarChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
     if (file && (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024)) {
-      setError("Выберите JPG, PNG или WebP размером не более 5 МБ.");
+      setError(t("profile.error.avatarType"));
       event.target.value = "";
       return;
     }
@@ -178,9 +179,9 @@ export default function ProfilePage() {
     setMessage("");
     try {
       await navigator.clipboard.writeText(`${window.location.origin}${publicProfilePath}`);
-      setMessage("Ссылка на профиль скопирована.");
+      setMessage(t("profile.message.linkCopied"));
     } catch (copyError) {
-      setError(copyError instanceof Error ? copyError.message : "Не удалось скопировать ссылку.");
+      setError(localizedError(language, copyError, "profile.error.copyLink"));
     }
   }
 
@@ -190,11 +191,12 @@ export default function ProfilePage() {
     setMessage("");
     if (!user || !profile) return;
     if (!isValidUsername(username)) {
-      setError("Никнейм: 3–20 символов, латинские буквы, цифры и _.");
+      setError(t("profile.error.username"));
       return;
     }
     setSaving(true);
     const supabase = getSupabaseClient();
+    let saveErrorKey = "profile.error.save";
     try {
       let avatarUrl = profile.avatar_url;
       if (avatarSelection) {
@@ -202,7 +204,10 @@ export default function ProfilePage() {
         const { error: uploadError } = await supabase.storage
           .from("avatars")
           .upload(path, avatarSelection.file, { upsert: true, contentType: avatarSelection.file.type });
-        if (uploadError) throw new Error(`Не удалось загрузить аватар: ${uploadError.message}`);
+        if (uploadError) {
+          saveErrorKey = "profile.error.avatarUpload";
+          throw new Error(uploadError.message);
+        }
         avatarUrl = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
       }
 
@@ -219,12 +224,12 @@ export default function ProfilePage() {
         .eq("id", user.id)
         .select("id,username,full_name,avatar_url,bio,faculty,course,role,is_verified,is_blocked,created_at")
         .single();
-      if (updateError) throw new Error(`Не удалось сохранить профиль: ${updateError.message}`);
+      if (updateError) throw new Error(updateError.message);
       setProfile(data as Profile);
       setAvatarSelection(null);
-      setMessage("Профиль сохранён.");
+      setMessage(t("profile.message.saved"));
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Не удалось сохранить профиль.");
+      setError(localizedError(language, saveError, saveErrorKey));
     } finally {
       setSaving(false);
     }
@@ -232,7 +237,7 @@ export default function ProfilePage() {
 
   async function handleSignOut() {
     if (!user || signingOut) return;
-    const confirmed = window.confirm("Вы уверены, что хотите выйти?");
+    const confirmed = window.confirm(t("profile.confirm.signOut"));
     if (!confirmed) return;
 
     setError("");
@@ -245,7 +250,7 @@ export default function ProfilePage() {
       }
       router.push("/");
     } catch (signOutError) {
-      setError(signOutError instanceof Error ? signOutError.message : "Не удалось выйти из аккаунта.");
+      setError(localizedError(language, signOutError, "profile.error.signOut"));
       setSigningOut(false);
     }
   }
@@ -254,14 +259,6 @@ export default function ProfilePage() {
   const ownItems = useMemo(
     () => storedItems.filter((item) => item.ownerId === user?.id),
     [storedItems, user?.id],
-  );
-  const createdListings = useMemo(
-    () =>
-      [...ownItems].sort(
-        (left, right) =>
-          Date.parse(right.createdAt ?? "") - Date.parse(left.createdAt ?? ""),
-      ),
-    [ownItems],
   );
   const favoriteItems = useMemo(
     () => allItems.filter((item) => favoriteIds.includes(item.id)),
@@ -290,7 +287,7 @@ export default function ProfilePage() {
     if (!user || !editingItem) return;
 
     if (!editingItemForm.title.trim() || !editingItemForm.category || !editingItemForm.place.trim() || !editingItemForm.date || !editingItemForm.details.trim()) {
-      setError("Заполните все обязательные поля.");
+      setError(t("profile.error.requiredFields"));
       return;
     }
 
@@ -309,10 +306,10 @@ export default function ProfilePage() {
             ? Number(editingItemForm.rewardAmount)
             : null,
       });
-      setMessage("Объявление обновлено.");
+      setMessage(t("profile.message.listingUpdated"));
       setEditingItem(null);
     } catch (itemEditError) {
-      setError(itemEditError instanceof Error ? itemEditError.message : "Не удалось обновить объявление.");
+      setError(localizedError(language, itemEditError, "profile.error.listingUpdate"));
     } finally {
       setIsSavingItemEdit(false);
     }
@@ -320,22 +317,25 @@ export default function ProfilePage() {
 
   async function deleteOwnItem(item: Item) {
     if (!user) return;
-    const confirmed = window.confirm(`Удалить объявление «${item.title}»? Это действие нельзя отменить.`);
+    const confirmed = window.confirm(
+      t("profile.item.deleteConfirm").replace("{title}", item.title),
+    );
     if (!confirmed) return;
 
     setError("");
     setMessage("");
     try {
       await deleteStoredItem(item.id, user.id);
-      setMessage("Объявление удалено.");
+      setMessage(t("profile.message.listingDeleted"));
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Не удалось удалить объявление.");
+      setError(localizedError(language, deleteError, "profile.error.listingDelete"));
     }
   }
 
   function renderItemRow(item: Item, saved = false, includeActions = false) {
     const matches = item.type === "lost" ? getSimilarFoundItems(item, storedItems) : [];
     const progress = item.type === "lost" ? getLostItemProgress(item, matches.length > 0) : 0;
+    const localizedItem = localizeDemoItem(item, language);
     return (
       <article className="account-listing" key={`${saved ? "saved-" : ""}${item.id}`}>
         <Link className="account-listing-main" href={`/item/${encodeURIComponent(item.id)}`}>
@@ -343,15 +343,24 @@ export default function ProfilePage() {
             {item.imageDataUrl ? <span style={{ backgroundImage: `url("${item.imageDataUrl}")` }} /> : item.symbol}
           </span>
           <span className="account-listing-copy">
-            <strong>{item.title}</strong>
-            <small>{item.place} · {item.category}</small>
+            <strong>{localizedItem.title}</strong>
+            <small>
+              {localizedItem.place} · {localizedItem.categoryKey
+                ? t(`category.${localizedItem.categoryKey}`)
+                : item.category}
+            </small>
             <span className={`account-status ${item.status}`}>
-              {item.status === "returned" ? "Возвращено" : item.type === "found" ? "Найдено" : "Ищем"}
+              {t(item.status === "returned" ? "status.returned" : item.type === "found" ? "status.found" : "status.searching")}
             </span>
             {item.type === "lost" && (
               <span className="mini-progress">
                 <span className="mini-progress-track"><span style={{ width: `${((progress + 1) / 4) * 100}%` }} /></span>
-                <small>{["Объявление опубликовано", "Ищем совпадения", "Есть похожее объявление", "Вещь возвращена"][progress]}</small>
+                <small>{[
+                  t("detail.progress.published"),
+                  t("detail.progress.searching"),
+                  t("detail.progress.match"),
+                  t("detail.progress.returned"),
+                ][progress]}</small>
               </span>
             )}
           </span>
@@ -359,15 +368,15 @@ export default function ProfilePage() {
         {includeActions ? (
           <div className="account-listing-actions">
             <button className="account-listing-action account-listing-action-edit" onClick={() => openEditItem(item)} type="button">
-              Редактировать
+              {t("profile.item.edit")}
             </button>
             <button className="account-listing-action account-listing-action-delete" onClick={() => void deleteOwnItem(item)} type="button">
-              Удалить
+              {t("profile.item.delete")}
             </button>
           </div>
         ) : saved ? (
           <button
-            aria-label={`Убрать «${item.title}» из избранного`}
+            aria-label={`${t("favorites.remove")} «${item.title}»`}
             className="favorite-remove-button"
             onClick={() => toggleFavorite(item.id)}
             type="button"
@@ -388,27 +397,27 @@ export default function ProfilePage() {
           <div className="profile-empty"><h1>{t("profile.signInTitle")}</h1><p>{t("profile.signInDescription")}</p><Button href="/login" variant="contained">{t("nav.login")}</Button></div>
         ) : (
           <>
-            <header className="profile-page-heading"><span className="section-kicker">ВАШ АККАУНТ</span><h1>Профиль</h1></header>
+            <header className="profile-page-heading"><span className="section-kicker">{t("profile.kicker")}</span><h1>{t("profile.title")}</h1></header>
             {error && <Alert severity="error">{error}</Alert>}
             {message && <Alert severity="success">{message}</Alert>}
-            {profile?.role === "admin" && <Link className="profile-admin-link" href="/admin">Открыть панель администратора</Link>}
-            {profileLoading ? <p>Загружаем профиль…</p> : profile ? (
+            {profile?.role === "admin" && <Link className="profile-admin-link" href="/admin">{t("profile.adminLink")}</Link>}
+            {profileLoading ? <p>{t("profile.loadingData")}</p> : profile ? (
               <>
                 <section className="account-overview">
                   <div className="account-overview-avatar profile-avatar-preview">
-                    {profile.avatar_url ? <span role="img" aria-label="Аватар профиля" style={{ backgroundImage: `url("${profile.avatar_url}")` }} /> : <span>{(profile.full_name || profile.username).slice(0, 1).toUpperCase()}</span>}
+                    {profile.avatar_url ? <span role="img" aria-label={t("profile.settings.avatarAria")} style={{ backgroundImage: `url("${profile.avatar_url}")` }} /> : <span>{(profile.full_name || profile.username).slice(0, 1).toUpperCase()}</span>}
                   </div>
                   <div className="account-overview-copy">
                     <span className="profile-username">@{profile.username} {profile.is_verified && <VerifiedBadge />}</span>
                     <h2>{profile.full_name || profile.username}</h2>
-                    <p>{profile.bio || "Добавьте пару слов о себе в настройках профиля."}</p>
+                    <p>{profile.bio || t("profile.bioPlaceholder")}</p>
                   </div>
-                  <button className="account-edit-shortcut" onClick={() => setActiveTab("settings")} type="button">Изменить профиль</button>
+                  <button className="account-edit-shortcut" onClick={() => setActiveTab("settings")} type="button">{t("profile.editButton")}</button>
                 </section>
                 <div className="account-stat-grid">
-                  <article><strong>{ownItems.length}</strong><span>объявлений</span></article>
-                  <article><strong>{ownItems.filter((item) => item.status === "returned").length}</strong><span>возвращено</span></article>
-                  <article><strong>{favoriteIds.length}</strong><span>в избранном</span></article>
+                  <article><strong>{ownItems.length}</strong><span>{t("profile.stats.listings")}</span></article>
+                  <article><strong>{ownItems.filter((item) => item.status === "returned").length}</strong><span>{t("profile.stats.returned")}</span></article>
+                  <article><strong>{favoriteIds.length}</strong><span>{t("profile.stats.favorites")}</span></article>
                 </div>
                 <div className="profile-signout-row">
                   <Button
@@ -418,10 +427,10 @@ export default function ProfilePage() {
                     onClick={handleSignOut}
                     variant="outlined"
                   >
-                    {signingOut ? "Выходим…" : "Выйти"}
+                    {signingOut ? t("profile.signingOut") : t("profile.signOut")}
                   </Button>
                 </div>
-                <div className="account-tabs" role="tablist" aria-label="Разделы профиля">
+                <div className="account-tabs" role="tablist" aria-label={t("profile.tablist")}>
                   {profileTabs.map((tab) => (
                     <button
                       aria-selected={activeTab === tab.id}
@@ -435,20 +444,20 @@ export default function ProfilePage() {
                     </button>
                   ))}
                 </div>
-                {itemsError && <Alert severity="error">{itemsError}</Alert>}
-                {favoritesError && <Alert severity="error">{favoritesError}</Alert>}
-                {!itemsReady ? <p>Загружаем объявления…</p> : (
+                {itemsError && <Alert severity="error">{localizedError(language, itemsError, "profile.error.loadListings")}</Alert>}
+                {favoritesError && <Alert severity="error">{localizedError(language, favoritesError, "profile.error.loadFavorites")}</Alert>}
+                {!itemsReady ? <p>{t("profile.loadingItems")}</p> : (
                   <section className="account-tab-panel" role="tabpanel">
                     {activeTab === "listings" && (
                       <>
-                        <div className="account-section-heading"><div><span className="section-kicker">ВАШИ ПУБЛИКАЦИИ</span><h2>Мои объявления</h2></div><Button href="/add" variant="contained">＋ Добавить</Button></div>
-                        {ownItems.length ? <div className="account-list">{ownItems.map((item) => renderItemRow(item, false, true))}</div> : <div className="account-empty"><span aria-hidden="true">⌕</span><h3>Объявлений пока нет</h3><p>Опубликуйте потерянную или найденную вещь — здесь появится её статус и прогресс.</p><Button href="/add" variant="contained">Создать объявление</Button></div>}
+                        <div className="account-section-heading"><div><span className="section-kicker">{t("profile.listings.kicker")}</span><h2>{t("profile.listings.title")}</h2></div><Button href="/add" variant="contained">＋ {t("profile.listings.add")}</Button></div>
+                        {ownItems.length ? <div className="account-list">{ownItems.map((item) => renderItemRow(item, false, true))}</div> : <div className="account-empty"><span aria-hidden="true">⌕</span><h3>{t("profile.listings.emptyTitle")}</h3><p>{t("profile.listings.emptyDescription")}</p><Button href="/add" variant="contained">{t("profile.listings.create")}</Button></div>}
                       </>
                     )}
                     {activeTab === "favorites" && (
                       <>
-                        <div className="account-section-heading"><div><span className="section-kicker">СОХРАНЁННОЕ</span><h2>Избранное</h2></div></div>
-                        {favoriteItems.length ? <div className="account-list">{favoriteItems.map((item) => renderItemRow(item, true))}</div> : <div className="account-empty"><span aria-hidden="true">♡</span><h3>Пока ничего не сохранено</h3><p>Нажмите на сердечко в объявлении, чтобы быстро вернуться к нему.</p><Button href="/" variant="outlined">Посмотреть объявления</Button></div>}
+                        <div className="account-section-heading"><div><span className="section-kicker">{t("profile.favorites.kicker")}</span><h2>{t("profile.tab.favorites")}</h2></div></div>
+                        {favoriteItems.length ? <div className="account-list">{favoriteItems.map((item) => renderItemRow(item, true))}</div> : <div className="account-empty"><span aria-hidden="true">♡</span><h3>{t("profile.favorites.emptyTitle")}</h3><p>{t("profile.favorites.emptyDescription")}</p><Button href="/" variant="outlined">{t("profile.favorites.browse")}</Button></div>}
                       </>
                     )}
                     {activeTab === "sightings" && (
@@ -522,6 +531,22 @@ export default function ProfilePage() {
                                   {sighting.address ||
                                     `${sighting.latitude.toFixed(5)}, ${sighting.longitude.toFixed(5)}`}
                                 </p>
+                                {sighting.photoUrl && (
+                                  <a
+                                    className="item-sighting-photo"
+                                    href={sighting.photoUrl}
+                                    rel="noreferrer"
+                                    target="_blank"
+                                  >
+                                    <Image
+                                      alt={t("sighting.photoAlt")}
+                                      fill
+                                      sizes="320px"
+                                      src={sighting.photoUrl}
+                                      unoptimized
+                                    />
+                                  </a>
+                                )}
                                 {sighting.comment && (
                                   <p>
                                     <strong>{t("profile.sightings.commentLabel")}: </strong>
@@ -548,89 +573,23 @@ export default function ProfilePage() {
                             </Button>
                           </div>
                         )}
-                        <section className="profile-created-listings">
-                          <header className="item-sightings-heading">
-                            <div>
-                              <span className="section-kicker">
-                                {t("profile.activity.kicker")}
-                              </span>
-                              <h2>{t("profile.activity.title")}</h2>
-                            </div>
-                            <span>{createdListings.length}</span>
-                          </header>
-                          {createdListings.length ? (
-                            <div className="item-sighting-list">
-                              {createdListings.map((item) => {
-                                const createdAt = item.createdAt
-                                  ? new Date(item.createdAt)
-                                  : null;
-                                return (
-                                  <article
-                                    className="item-sighting-card"
-                                    key={item.id}
-                                  >
-                                    <div className="item-sighting-byline">
-                                      <strong>
-                                        <Link
-                                          href={`/item/${encodeURIComponent(item.id)}`}
-                                        >
-                                          {item.title}
-                                        </Link>
-                                      </strong>
-                                      {createdAt &&
-                                        !Number.isNaN(createdAt.getTime()) && (
-                                          <time dateTime={item.createdAt}>
-                                            {new Intl.DateTimeFormat(locale, {
-                                              dateStyle: "medium",
-                                              timeStyle: "short",
-                                            }).format(createdAt)}
-                                          </time>
-                                        )}
-                                    </div>
-                                    <small>
-                                      {t("profile.activity.listingAdded")} ·{" "}
-                                      {t(
-                                        item.type === "lost"
-                                          ? "detail.lost"
-                                          : "detail.found",
-                                      )}
-                                    </small>
-                                    <p>
-                                      <strong>{t("detail.place")}: </strong>
-                                      {item.place}
-                                    </p>
-                                  </article>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="account-empty">
-                              <span aria-hidden="true">＋</span>
-                              <h3>{t("profile.activity.emptyTitle")}</h3>
-                              <p>{t("profile.activity.emptyDescription")}</p>
-                              <Button href="/add" variant="outlined">
-                                {t("profile.activity.create")}
-                              </Button>
-                            </div>
-                          )}
-                        </section>
                       </>
                     )}
                     {activeTab === "settings" && (
                       <>
-                        <div className="account-section-heading"><div><span className="section-kicker">ЛИЧНАЯ ИНФОРМАЦИЯ</span><h2>Редактирование профиля</h2></div></div>
+                        <div className="account-section-heading"><div><span className="section-kicker">{t("profile.settings.kicker")}</span><h2>{t("profile.settings.title")}</h2></div></div>
                         <form className="profile-edit-card" onSubmit={saveProfile}>
                           <div className="profile-avatar-preview">
                             {avatarSelection ? (
                               <span
                                 role="img"
-                                aria-label="Предварительный просмотр аватара"
+                                aria-label={t("profile.settings.avatarPreview")}
                                 style={{ backgroundImage: `url("${avatarSelection.previewUrl}")` }}
                               />
                             ) : profile.avatar_url ? (
                               <span
                                 role="img"
-                                aria-label="Аватар профиля"
+                                aria-label={t("profile.settings.avatarAria")}
                                 style={{ backgroundImage: `url("${profile.avatar_url}")` }}
                               />
                             ) : (
@@ -643,29 +602,29 @@ export default function ProfilePage() {
                           <div className="profile-edit-tools">
                             <div className="profile-completion">
                               <div className="profile-completion-label">
-                                <span>Заполненность профиля</span>
+                                <span>{t("profile.settings.completion")}</span>
                                 <strong>{completion}%</strong>
                               </div>
-                              <progress aria-label="Заполненность профиля" max={100} value={completion} />
+                              <progress aria-label={t("profile.settings.completion")} max={100} value={completion} />
                             </div>
                             <div className="profile-public-actions">
-                              {publicProfilePath && <Link href={publicProfilePath}>Открыть профиль</Link>}
+                              {publicProfilePath && <Link href={publicProfilePath}>{t("profile.settings.openPublic")}</Link>}
                               <Button
                                 disabled={!publicProfilePath}
                                 onClick={copyProfileLink}
                                 type="button"
                                 variant="outlined"
                               >
-                                Скопировать ссылку
+                                {t("profile.settings.copyLink")}
                               </Button>
                             </div>
                           </div>
                           <div className="form-group">
-                            <span className="form-label">Фото профиля</span>
+                            <span className="form-label">{t("profile.settings.avatar")}</span>
                             <div className="profile-avatar-upload">
                               <input
                                 accept="image/jpeg,image/png,image/webp"
-                                aria-label="Фото профиля"
+                                aria-label={t("profile.settings.avatar")}
                                 className="profile-avatar-input"
                                 onChange={onAvatarChange}
                                 ref={avatarFileInput}
@@ -679,19 +638,19 @@ export default function ProfilePage() {
                                 variant="outlined"
                               >
                                 <span aria-hidden="true">↑</span>
-                                Выбрать фото
+                                {t("profile.settings.chooseAvatar")}
                               </Button>
                               <div aria-live="polite" className="profile-avatar-upload-copy">
                                 <strong>
                                   {avatarSelection?.file.name
-                                    ?? (profile.avatar_url ? "Текущее фото" : "Фото не выбрано")}
+                                    ?? (profile.avatar_url ? t("profile.settings.currentAvatar") : t("profile.settings.noAvatar"))}
                                 </strong>
-                                <span>JPG, PNG или WebP · до 5 МБ</span>
+                                <span>{t("form.photoTypes")}</span>
                               </div>
                             </div>
                           </div>
                           <label className="form-group">
-                            <span className="form-label">Никнейм <span>*</span></span>
+                            <span className="form-label">{t("profile.settings.username")} <span>*</span></span>
                             <input
                               maxLength={20}
                               minLength={3}
@@ -702,7 +661,7 @@ export default function ProfilePage() {
                             />
                           </label>
                           <label className="form-group">
-                            <span className="form-label">Имя</span>
+                            <span className="form-label">{t("profile.settings.fullName")}</span>
                             <input
                               maxLength={80}
                               onChange={(event) => setFullName(event.target.value)}
@@ -710,7 +669,7 @@ export default function ProfilePage() {
                             />
                           </label>
                           <label className="form-group">
-                            <span className="form-label">О себе</span>
+                            <span className="form-label">{t("profile.settings.bio")}</span>
                             <textarea
                               maxLength={500}
                               onChange={(event) => setBio(event.target.value)}
@@ -720,7 +679,7 @@ export default function ProfilePage() {
                           </label>
                           <div className="profile-form-columns">
                             <label className="form-group">
-                              <span className="form-label">Факультет</span>
+                              <span className="form-label">{t("profile.settings.faculty")}</span>
                               <input
                                 maxLength={120}
                                 onChange={(event) => setFaculty(event.target.value)}
@@ -728,7 +687,7 @@ export default function ProfilePage() {
                               />
                             </label>
                             <label className="form-group">
-                              <span className="form-label">Курс</span>
+                              <span className="form-label">{t("profile.settings.course")}</span>
                               <input
                                 max={8}
                                 min={1}
@@ -739,10 +698,10 @@ export default function ProfilePage() {
                             </label>
                           </div>
                           <Button disabled={saving} type="submit" variant="contained">
-                            {saving ? "Сохраняем…" : "Сохранить профиль"}
+                            {saving ? t("profile.settings.saving") : t("profile.settings.save")}
                           </Button>
                           <p className="profile-edit-note">
-                            Роль администратора и подтверждение профиля может менять только администратор.
+                            {t("profile.settings.note")}
                           </p>
                         </form>
                       </>
@@ -752,12 +711,12 @@ export default function ProfilePage() {
                 {editingItem && (
                   <Dialog fullWidth maxWidth="sm" onClose={() => setEditingItem(null)} open={Boolean(editingItem)}>
                     <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
-                      <span>Редактировать объявление</span>
+                      <span>{t("profile.item.edit")}</span>
                     </DialogTitle>
                     <DialogContent>
                       <form className="item-edit-form" id="profile-edit-item-form" onSubmit={saveEditedItem}>
-                        <label className="form-group"><span className="form-label">Название</span><input maxLength={80} onChange={(event) => setEditingItemForm((current) => ({ ...current, title: event.target.value }))} required value={editingItemForm.title} /></label>
-                        <label className="form-group"><span className="form-label">Тип объявления</span><select onChange={(event) => { const type = event.target.value === "found" ? "found" : "lost"; setEditingItemForm((current) => ({ ...current, type, ...(type === "found" ? { rewardEnabled: false, rewardAmount: "" } : {}) })); }} value={editingItemForm.type}><option value="lost">Потерял</option><option value="found">Нашёл</option></select></label>
+                        <label className="form-group"><span className="form-label">{t("form.itemName")}</span><input maxLength={80} onChange={(event) => setEditingItemForm((current) => ({ ...current, title: event.target.value }))} required value={editingItemForm.title} /></label>
+                        <label className="form-group"><span className="form-label">{t("profile.item.type")}</span><select onChange={(event) => { const type = event.target.value === "found" ? "found" : "lost"; setEditingItemForm((current) => ({ ...current, type, ...(type === "found" ? { rewardEnabled: false, rewardAmount: "" } : {}) })); }} value={editingItemForm.type}><option value="lost">{t("form.lostByMe")}</option><option value="found">{t("form.foundByMe")}</option></select></label>
                         <RewardAmountField
                           amount={editingItemForm.rewardAmount}
                           enabled={editingItemForm.rewardEnabled}
@@ -765,23 +724,23 @@ export default function ProfilePage() {
                           onAmountChange={(rewardAmount) => setEditingItemForm((current) => ({ ...current, rewardAmount }))}
                           onEnabledChange={(rewardEnabled) => setEditingItemForm((current) => ({ ...current, rewardEnabled, rewardAmount: rewardEnabled ? current.rewardAmount : "" }))}
                         />
-                        <label className="form-group"><span className="form-label">Категория</span><select onChange={(event) => setEditingItemForm((current) => ({ ...current, category: event.target.value }))} required value={editingItemForm.category}>{["Документы", "Телефон", "Ключи", "Наушники", "Одежда", "Сумки", "Другое", "Электроника", "Книги"].map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
-                        <label className="form-group"><span className="form-label">Место</span><input maxLength={120} onChange={(event) => setEditingItemForm((current) => ({ ...current, place: event.target.value }))} required value={editingItemForm.place} /></label>
-                        <label className="form-group"><span className="form-label">Дата</span><input onChange={(event) => setEditingItemForm((current) => ({ ...current, date: event.target.value }))} required type="date" value={editingItemForm.date} /></label>
-                        <label className="form-group"><span className="form-label">Цена, ₸ (необязательно)</span><input max={9_999_999_999.99} min={0} onChange={(event) => setEditingItemForm((current) => ({ ...current, price: event.target.value }))} step="0.01" type="number" value={editingItemForm.price} /></label>
-                        <label className="form-group"><span className="form-label">Описание</span><textarea maxLength={1500} onChange={(event) => setEditingItemForm((current) => ({ ...current, details: event.target.value }))} rows={4} value={editingItemForm.details} /></label>
+                        <label className="form-group"><span className="form-label">{t("form.category")}</span><select onChange={(event) => setEditingItemForm((current) => ({ ...current, category: event.target.value }))} required value={editingItemForm.category}>{["Документы", "Телефон", "Ключи", "Наушники", "Одежда", "Сумки", "Другое", "Электроника", "Книги"].map((category) => { const categoryKey = categoryTranslationKey(category); return <option key={category} value={category}>{categoryKey ? t(categoryKey) : category}</option>; })}</select></label>
+                        <label className="form-group"><span className="form-label">{t("form.location")}</span><input maxLength={120} onChange={(event) => setEditingItemForm((current) => ({ ...current, place: event.target.value }))} required value={editingItemForm.place} /></label>
+                        <label className="form-group"><span className="form-label">{t("form.date")}</span><input onChange={(event) => setEditingItemForm((current) => ({ ...current, date: event.target.value }))} required type="date" value={editingItemForm.date} /></label>
+                        <label className="form-group"><span className="form-label">{t("form.price")}</span><input max={9_999_999_999.99} min={0} onChange={(event) => setEditingItemForm((current) => ({ ...current, price: event.target.value }))} step="0.01" type="number" value={editingItemForm.price} /></label>
+                        <label className="form-group"><span className="form-label">{t("form.description")}</span><textarea maxLength={1500} onChange={(event) => setEditingItemForm((current) => ({ ...current, details: event.target.value }))} rows={4} value={editingItemForm.details} /></label>
                       </form>
                     </DialogContent>
                     <DialogActions sx={{ padding: "0 24px 20px" }}>
-                      <Button onClick={() => setEditingItem(null)} variant="outlined">Отмена</Button>
+                      <Button onClick={() => setEditingItem(null)} variant="outlined">{t("form.cancel")}</Button>
                       <Button disabled={isSavingItemEdit} form="profile-edit-item-form" type="submit" variant="contained">
-                        {isSavingItemEdit ? "Сохраняем…" : "Сохранить изменения"}
+                        {isSavingItemEdit ? t("form.savingChanges") : t("form.saveChanges")}
                       </Button>
                     </DialogActions>
                   </Dialog>
                 )}
               </>
-            ) : <Alert severity="error">Профиль не найден. Попробуйте выйти и войти снова.</Alert>}
+            ) : <Alert severity="error">{t("profile.notFound")}</Alert>}
           </>
         )}
       </section>

@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { DemoUser } from "@/lib/demo-auth";
+import { useLanguage } from "@/components/language-provider";
+import { localizedError, translate } from "@/lib/messages";
 
 export function useDemoAuth() {
+  const { language } = useLanguage();
   const [user, setUser] = useState<DemoUser | null>(null);
   const [error, setError] = useState("");
   const [isReady, setIsReady] = useState(false);
@@ -27,7 +30,7 @@ export function useDemoAuth() {
                     (typeof account.user_metadata.name === "string" &&
                       account.user_metadata.name) ||
                     account.email ||
-                    "Пользователь",
+                    translate(language, "auth.defaultName"),
                   email: account.email ?? "",
                 }
               : null,
@@ -41,7 +44,7 @@ export function useDemoAuth() {
           await supabase.auth.getSession();
         if (!active) return;
         if (sessionError) {
-          setError(sessionError.message);
+          setError(localizedError(language, sessionError, "auth.error.session"));
           setIsReady(true);
           return;
         }
@@ -54,7 +57,7 @@ export function useDemoAuth() {
                   (typeof account.user_metadata.name === "string" &&
                     account.user_metadata.name) ||
                   account.email ||
-                  "Пользователь",
+                  translate(language, "auth.defaultName"),
                 email: account.email ?? "",
               }
             : null,
@@ -62,11 +65,7 @@ export function useDemoAuth() {
         setIsReady(true);
       } catch (authError) {
         if (!active) return;
-        setError(
-          authError instanceof Error
-            ? authError.message
-            : "Не удалось подключиться к Supabase.",
-        );
+        setError(localizedError(language, authError, "auth.error.session"));
         setIsReady(true);
       }
     };
@@ -77,7 +76,7 @@ export function useDemoAuth() {
       active = false;
       unsubscribe();
     };
-  }, []);
+  }, [language]);
 
   return { user, error, isReady };
 }
