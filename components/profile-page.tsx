@@ -587,28 +587,16 @@ export default function ProfilePage() {
                     )}
                     {activeTab === "settings" && (
                       <>
-                        <div className="account-section-heading"><div><span className="section-kicker">{t("profile.settings.kicker")}</span><h2>{t("profile.settings.title")}</h2></div></div>
                         <form className="profile-edit-card" onSubmit={saveProfile}>
-                          <div className="profile-avatar-preview">
-                            {avatarSelection ? (
+                          {avatarSelection && (
+                            <div className="profile-avatar-preview">
                               <span
                                 role="img"
                                 aria-label={t("profile.settings.avatarPreview")}
                                 style={{ backgroundImage: `url("${avatarSelection.previewUrl}")` }}
                               />
-                            ) : profile.avatar_url ? (
-                              <span
-                                role="img"
-                                aria-label={t("profile.settings.avatarAria")}
-                                style={{ backgroundImage: `url("${profile.avatar_url}")` }}
-                              />
-                            ) : (
-                              <span>{(profile.full_name || profile.username).slice(0, 1).toUpperCase()}</span>
-                            )}
-                          </div>
-                          <p className="profile-username">
-                            @{profile.username} {profile.is_verified && <VerifiedBadge />}
-                          </p>
+                            </div>
+                          )}
                           <div className="profile-edit-tools">
                             <div className="profile-completion">
                               <div className="profile-completion-label">
