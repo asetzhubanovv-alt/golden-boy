@@ -104,7 +104,6 @@ export default function ItemDetail({ id }: { id: string }) {
     isSubscribed,
     subscribeToItem,
     unsubscribeFromItem,
-    error: notificationsError,
   } = useItemNotifications();
   const [actionError, setActionError] = useState("");
   const [reportReason, setReportReason] = useState("");
@@ -744,11 +743,17 @@ export default function ItemDetail({ id }: { id: string }) {
                       return;
                     }
                     if (isSubscribed(item.id)) {
-                      unsubscribeFromItem(item.id);
+                      const unsubscribed = unsubscribeFromItem(item.id);
+                      setActionError(
+                        unsubscribed ? "" : t("notifications.error.unsubscribe"),
+                      );
                       return;
                     }
                     if (window.confirm(t("detail.subscribeConfirm").replace("{title}", localizedItem?.title ?? item.title))) {
-                      subscribeToItem(item);
+                      const subscribed = subscribeToItem(item);
+                      setActionError(
+                        subscribed ? "" : t("notifications.error.subscribe"),
+                      );
                     }
                   }}
                   title={isSubscribed(item.id) ? t("detail.subscribed") : t("detail.subscribe")}
@@ -759,6 +764,39 @@ export default function ItemDetail({ id }: { id: string }) {
                 </Button>
               )}
               <div className="detail-quick-actions">
+                {itemOwnerId && (
+                  <Button
+                    aria-label={t("detail.openChat")}
+                    className="chat-item-button"
+                    disabled={!isAuthReady}
+                    onClick={() => {
+                      if (itemOwnerId === user?.id) {
+                        router.push("/messages");
+                        return;
+                      }
+                      router.push(
+                        `/messages?userId=${encodeURIComponent(itemOwnerId)}&itemId=${encodeURIComponent(item.id)}`,
+                      );
+                    }}
+                    title={t("detail.openChat")}
+                    variant="outlined"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      fill="none"
+                      height="20"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.8"
+                      viewBox="0 0 24 24"
+                      width="20"
+                    >
+                      <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.7-3.1A7.5 7.5 0 1 1 20 11.5Z" />
+                      <path d="M8.5 11.5h7M8.5 14.5h4" />
+                    </svg>
+                  </Button>
+                )}
                 <Button
                   aria-label={favoriteIds.includes(item.id) ? t("favorites.remove") : t("favorites.add")}
                   aria-pressed={favoriteIds.includes(item.id)}
@@ -787,11 +825,11 @@ export default function ItemDetail({ id }: { id: string }) {
               </div>
             </div>
 
-            {(storageError || actionError || favoritesError || notificationsError) && (
+            {(storageError || actionError || favoritesError) && (
               <Alert className="detail-alert" severity="error">
                 {localizedError(
                   language,
-                  storageError || actionError || favoritesError || notificationsError,
+                  storageError || actionError || favoritesError,
                   "detail.error.general",
                 )}
               </Alert>
@@ -1230,10 +1268,6 @@ export default function ItemDetail({ id }: { id: string }) {
           </article>
         </div>
 
-        <div className="detail-back-row">
-          <Link href="/">← {t("detail.backAll")}</Link>
-          <span>{t("detail.backNote")}</span>
-        </div>
       </section>
 
       <SiteFooter />

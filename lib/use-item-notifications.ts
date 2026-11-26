@@ -785,6 +785,7 @@ function useItemNotificationsClient(userId: string | null): ItemNotificationsSta
   }, []);
 
   const unreadCount = parsed.notifications.filter((notification) => !notification.read).length;
+  const syncErrorMessage = syncError || parsed.error || parsedSubscriptions.error;
   const isSubscribed = useCallback(
     (itemId: string) => parsedSubscriptions.subscriptions.some((subscription) => subscription.itemId === itemId),
     [parsedSubscriptions.subscriptions],
@@ -835,11 +836,9 @@ function useItemNotificationsClient(userId: string | null): ItemNotificationsSta
     unreadCount,
     permission,
     isConnected,
-    error: localizedError(
-      language,
-      syncError || parsed.error || parsedSubscriptions.error,
-      "notifications.error.general",
-    ),
+    error: syncErrorMessage
+      ? localizedError(language, syncErrorMessage, "notifications.error.general")
+      : "",
     markRead,
     markAllRead,
     isSubscribed,
