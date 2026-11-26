@@ -16,6 +16,7 @@ import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
 import BackLink from "@/components/back-link";
 import { useLanguage } from "@/components/language-provider";
+import { localizedError } from "@/lib/messages";
 import { useDemoAuth } from "@/lib/use-demo-auth";
 import {
   createOrGetConversation,
@@ -461,7 +462,7 @@ export default function MessagesPage() {
           </Alert>
         ) : (
           <>
-            {pageError && <Alert className="messages-alert" severity="error">{pageError}</Alert>}
+            {pageError && <Alert className="messages-alert" severity="error">{localizedError(language, pageError, "chat.error.general")}</Alert>}
             <div className={`messages-layout${selectedConversation ? " has-selected-conversation" : ""}`}>
               <aside className="messages-sidebar">
                 <form className="messages-search" onSubmit={handleSearch}>
@@ -668,7 +669,9 @@ export default function MessagesPage() {
                     </div>
                     {(conversationError || isConversationUnavailable) && (
                       <Alert severity="error">
-                        {conversationError || "Чат не найден или у вас нет к нему доступа."}
+                        {conversationError
+                          ? localizedError(language, conversationError, "chat.error.general")
+                          : t("chat.unavailable")}
                       </Alert>
                     )}
                     {conversationNotice && <Alert severity="success">{conversationNotice}</Alert>}
@@ -806,7 +809,7 @@ export default function MessagesPage() {
                   </>
                 ) : isConversationUnavailable ? (
                   <Alert severity="error">
-                    Чат не найден или у вас нет к нему доступа.
+                    {t("chat.unavailable")}
                   </Alert>
                 ) : (
                   <div className="messages-welcome">

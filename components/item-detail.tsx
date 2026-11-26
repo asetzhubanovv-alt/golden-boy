@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
@@ -8,6 +14,7 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import IconButton from "@mui/material/IconButton";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import SiteFooter from "@/components/site-footer";
@@ -15,7 +22,8 @@ import SiteHeader from "@/components/site-header";
 import BackLink from "@/components/back-link";
 import { useLanguage } from "@/components/language-provider";
 import MapLocationPicker from "@/components/map-location-picker";
-import { categoryTranslationKey, type Language } from "@/lib/messages";
+import { categoryTranslationKey, localizedError, type Language } from "@/lib/messages";
+import { localizeDemoItem } from "@/lib/localized-demo-items";
 import {
   DEMO_ITEMS,
   ITEM_CATEGORIES,
@@ -33,7 +41,6 @@ import { useDemoAuth } from "@/lib/use-demo-auth";
 import VerifiedBadge from "@/components/verified-badge";
 import { useFavoriteItems } from "@/lib/use-favorite-items";
 import { getLostItemProgress, getSimilarFoundItems } from "@/lib/item-matching";
-import { OPEN_NOTIFICATIONS_EVENT } from "@/lib/use-item-notifications";
 import { useItemNotifications } from "@/lib/use-item-notifications";
 import OwnershipVerification from "@/components/ownership-verification";
 import RewardAmountField from "@/components/reward-amount-field";
@@ -42,6 +49,9 @@ import { createOrGetConversation } from "@/lib/chat";
 import {
   createItemSighting,
   getItemSightings,
+  isAllowedSightingPhotoType,
+  SIGHTING_PHOTO_ACCEPT,
+  SIGHTING_PHOTO_MAX_BYTES,
   subscribeToItemSightings,
   type ItemSighting,
 } from "@/lib/sightings";
@@ -71,6 +81,22 @@ export default function ItemDetail({ id }: { id: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedSightingId = searchParams.get("sighting");
+  const [sightingMapExpansion, setSightingMapExpansion] = useState(() => ({
+    requestedSightingId,
+    expanded: Boolean(requestedSightingId),
+  }));
+  const [sightingsListExpansion, setSightingsListExpansion] = useState(() => ({
+    requestedSightingId,
+    expanded: Boolean(requestedSightingId),
+  }));
+  const isSightingsListExpanded =
+    sightingsListExpansion.requestedSightingId === requestedSightingId
+      ? sightingsListExpansion.expanded
+      : Boolean(requestedSightingId);
+  const isSightingMapExpanded =
+    sightingMapExpansion.requestedSightingId === requestedSightingId
+      ? sightingMapExpansion.expanded
+      : Boolean(requestedSightingId);
   const { items: storedItems, error: storageError, isReady } = useStoredItems();
   const { user, isReady: isAuthReady } = useDemoAuth();
   const { favoriteIds, toggleFavorite, error: favoritesError } = useFavoriteItems(user?.id ?? null);
@@ -83,6 +109,7 @@ export default function ItemDetail({ id }: { id: string }) {
   const [actionError, setActionError] = useState("");
   const [reportReason, setReportReason] = useState("");
   const [reportMessage, setReportMessage] = useState("");
+  const [isOwnerControlsExpanded, setIsOwnerControlsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -110,6 +137,9 @@ export default function ItemDetail({ id }: { id: string }) {
   });
   const [sightingDate, setSightingDate] = useState(getLocalDateValue);
   const [sightingComment, setSightingComment] = useState("");
+  const [sightingPhoto, setSightingPhoto] = useState<File | null>(null);
+  const [sightingPhotoPreviewUrl, setSightingPhotoPreviewUrl] = useState("");
+  const [sightingPhotoError, setSightingPhotoError] = useState("");
   const [isSubmittingSighting, setIsSubmittingSighting] = useState(false);
   const [contactingSightingId, setContactingSightingId] = useState("");
   const sightingSubmitLock = useRef(false);
@@ -118,6 +148,7 @@ export default function ItemDetail({ id }: { id: string }) {
     storedItems.find((storedItem) => storedItem.id === id) ??
     DEMO_ITEMS.find((demoItem) => demoItem.id === id) ??
     null;
+  const localizedItem = item ? localizeDemoItem(item, language) : null;
   const itemOwnerId = item?.ownerId;
   const userId = user?.id;
   const isExampleItem = DEMO_ITEMS.some((demoItem) => demoItem.id === id);
@@ -150,6 +181,11 @@ export default function ItemDetail({ id }: { id: string }) {
   ];
 
   useEffect(() => {
+    if (!sightingPhotoPreviewUrl) return;
+    return () => URL.revokeObjectURL(sightingPhotoPreviewUrl);
+  }, [sightingPhotoPreviewUrl]);
+
+  useEffect(() => {
     if (!userId || item?.type !== "lost" || !item.ownerId || isExampleItem) return;
     let active = true;
 
@@ -166,7 +202,7 @@ export default function ItemDetail({ id }: { id: string }) {
             setSightingError(
               loadError instanceof Error
                 ? loadError.message
-                : "Не удалось загрузить отметки на карте.",
+                : t("detail.error.sightings"),
             );
           }
         });
@@ -183,7 +219,7 @@ export default function ItemDetail({ id }: { id: string }) {
       active = false;
       unsubscribe();
     };
-  }, [id, isExampleItem, item?.ownerId, item?.type, userId]);
+  }, [id, isExampleItem, item?.ownerId, item?.type, t, userId]);
 
   useEffect(() => {
     if (
@@ -208,7 +244,41 @@ export default function ItemDetail({ id }: { id: string }) {
     setSightingLocation({ address: "", latitude: null, longitude: null });
     setSightingDate(getLocalDateValue());
     setSightingComment("");
+    setSightingPhoto(null);
+    setSightingPhotoPreviewUrl("");
+    setSightingPhotoError("");
     setIsSightingDialogOpen(true);
+  }
+
+  function closeSightingDialog() {
+    setIsSightingDialogOpen(false);
+    setSightingPhoto(null);
+    setSightingPhotoPreviewUrl("");
+    setSightingPhotoError("");
+  }
+
+  function handleSightingPhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const photo = input.files?.[0] ?? null;
+    input.value = "";
+    setSightingPhotoError("");
+    if (!photo) return;
+
+    if (!isAllowedSightingPhotoType(photo.type)) {
+      setSightingPhoto(null);
+      setSightingPhotoPreviewUrl("");
+      setSightingPhotoError(t("sighting.photoTypeError"));
+      return;
+    }
+    if (photo.size <= 0 || photo.size > SIGHTING_PHOTO_MAX_BYTES) {
+      setSightingPhoto(null);
+      setSightingPhotoPreviewUrl("");
+      setSightingPhotoError(t("sighting.photoSizeError"));
+      return;
+    }
+
+    setSightingPhoto(photo);
+    setSightingPhotoPreviewUrl(URL.createObjectURL(photo));
   }
 
   async function handleSightingSubmit(event: FormEvent<HTMLFormElement>) {
@@ -235,6 +305,7 @@ export default function ItemDetail({ id }: { id: string }) {
         longitude,
         observedAt: sightingDate,
         comment: sightingComment,
+        photo: sightingPhoto,
       });
       setSightings((current) =>
         current.some((existing) => existing.id === sighting.id)
@@ -245,12 +316,15 @@ export default function ItemDetail({ id }: { id: string }) {
             ),
       );
       setIsSightingDialogOpen(false);
+      setSightingPhoto(null);
+      setSightingPhotoPreviewUrl("");
+      setSightingPhotoError("");
       setSightingNotice(t("sighting.sent"));
     } catch (submitError) {
       setSightingError(
         submitError instanceof Error
           ? submitError.message
-          : "Не удалось отправить наблюдение.",
+          : t("detail.error.sendSighting"),
       );
     } finally {
       sightingSubmitLock.current = false;
@@ -267,7 +341,7 @@ export default function ItemDetail({ id }: { id: string }) {
       router.push(`/messages?conversation=${encodeURIComponent(conversationId)}`);
     } catch (chatError) {
       setSightingError(
-        chatError instanceof Error ? chatError.message : "Не удалось открыть чат.",
+        chatError instanceof Error ? chatError.message : t("detail.error.openChat"),
       );
     } finally {
       setContactingSightingId("");
@@ -277,7 +351,7 @@ export default function ItemDetail({ id }: { id: string }) {
   async function handleStatusChange(status: ItemStatus) {
     setActionError("");
     try {
-      if (!user) throw new Error("Войди в аккаунт.");
+      if (!user) throw new Error(t("detail.error.loginRequired"));
       await updateStoredItem(id, user.id, { status });
     } catch (updateError) {
       setActionError(
@@ -313,15 +387,15 @@ export default function ItemDetail({ id }: { id: string }) {
     setActionError("");
 
     if (!editTitle.trim() || !editCategory || !editLocation.address.trim() || !editDate || !editDetails.trim()) {
-      setActionError("Заполните все обязательные поля.");
+      setActionError(t("detail.error.requiredFields"));
       return;
     }
     if (editLocation.latitude === null || editLocation.longitude === null) {
-      setActionError("Найдите адрес или выберите точку на карте.");
+      setActionError(t("detail.error.location"));
       return;
     }
     if (editLocation.address.trim().length > 120) {
-      setActionError("Адрес должен содержать не более 120 символов.");
+      setActionError(t("detail.error.addressLength"));
       return;
     }
 
@@ -333,7 +407,7 @@ export default function ItemDetail({ id }: { id: string }) {
 
     setIsSavingEdit(true);
     try {
-      if (!user) throw new Error("Войди в аккаунт.");
+      if (!user) throw new Error(t("detail.error.loginRequired"));
       await updateStoredItem(id, user.id, {
         title: editTitle,
         category: editCategory,
@@ -351,7 +425,7 @@ export default function ItemDetail({ id }: { id: string }) {
       });
       setIsEditing(false);
     } catch (editError) {
-      setActionError(editError instanceof Error ? editError.message : "Не удалось изменить объявление.");
+      setActionError(editError instanceof Error ? editError.message : t("detail.error.edit"));
     } finally {
       setIsSavingEdit(false);
     }
@@ -364,7 +438,7 @@ export default function ItemDetail({ id }: { id: string }) {
 
     setActionError("");
     try {
-      if (!user) throw new Error("Войди в аккаунт.");
+      if (!user) throw new Error(t("detail.error.loginRequired"));
       await deleteStoredItem(id, user.id);
       router.push("/");
     } catch (deleteError) {
@@ -408,14 +482,14 @@ export default function ItemDetail({ id }: { id: string }) {
         await navigator.share({ title: item?.title, url });
       } else {
         await navigator.clipboard.writeText(url);
-        setReportMessage("Ссылка скопирована.");
+        setReportMessage(t("detail.shareCopied"));
       }
     } catch (shareError) {
       if (shareError instanceof DOMException && shareError.name === "AbortError") return;
       setActionError(
         shareError instanceof Error
           ? shareError.message
-          : "Не удалось поделиться ссылкой.",
+          : t("detail.error.share"),
       );
     }
   }
@@ -440,7 +514,9 @@ export default function ItemDetail({ id }: { id: string }) {
             {t("detail.notFoundDescription")}
           </p>
           {(storageError || actionError) && (
-            <Alert severity="error">{storageError || actionError}</Alert>
+            <Alert severity="error">
+              {localizedError(language, storageError || actionError, "detail.error.general")}
+            </Alert>
           )}
           <Button
             className="detail-primary-button"
@@ -462,35 +538,57 @@ export default function ItemDetail({ id }: { id: string }) {
       <section className="detail-page container">
         <BackLink />
         <div className="form-breadcrumb">
-          <Link href="/">Лента</Link>
+          <Link href="/">{t("detail.backToFeed")}</Link>
           <span aria-hidden="true">/</span>
-          <span>{item.title}</span>
+          <span>{localizedItem?.title ?? item.title}</span>
         </div>
 
         <div className="detail-layout">
-          <div
-            className={`detail-art item-art ${item.art}${item.imageDataUrl ? " has-photo" : ""}`}
-            style={
-              item.imageDataUrl
-                ? { backgroundImage: `url("${item.imageDataUrl}")` }
-                : undefined
-            }
-          >
-            {!item.imageDataUrl && (
-              <>
-                <span className="art-shape art-shape-one" />
-                <span className="art-shape art-shape-two" />
-                <span className="art-symbol">{item.symbol}</span>
-              </>
-            )}
-            <div className="detail-badges">
-              <span className={`detail-type-badge ${item.type}`}>
-                {item.type === "lost" ? t("detail.lost") : t("detail.found")}
-              </span>
-              {item.type === "lost" && item.rewardAmount != null && item.rewardAmount > 0 && (
-                <span className="reward-badge">💰 ВОЗНАГРАЖДЕНИЕ</span>
+          <div className="detail-media-column">
+            <div
+              className={`detail-art item-art ${item.art}${item.imageDataUrl ? " has-photo" : ""}`}
+              style={
+                item.imageDataUrl
+                  ? { backgroundImage: `url("${item.imageDataUrl}")` }
+                  : undefined
+              }
+            >
+              {!item.imageDataUrl && (
+                <>
+                  <span className="art-shape art-shape-one" />
+                  <span className="art-shape art-shape-two" />
+                  <span className="art-symbol">{item.symbol}</span>
+                </>
               )}
+              <div className="detail-badges">
+                <span className={`detail-type-badge ${item.type}`}>
+                  {item.type === "lost" ? t("detail.lost") : t("detail.found")}
+                </span>
+                {item.type === "lost" && item.rewardAmount != null && item.rewardAmount > 0 && (
+                  <span className="reward-badge">💰 {t("detail.rewardBadge")}</span>
+                )}
+              </div>
             </div>
+            <section aria-labelledby="item-location-title" className="item-location-section">
+              <h2 id="item-location-title">{t("detail.place")}</h2>
+              {item.latitude != null && item.longitude != null ? (
+                <MapLocationPicker
+                  compact
+                  language={language}
+                  readOnly
+                  value={{
+                    address: localizedItem?.place ?? item.place,
+                    latitude: item.latitude,
+                    longitude: item.longitude,
+                  }}
+                />
+              ) : (
+                <p className="item-location-unavailable">
+                  {localizedItem?.place ?? item.place}.{" "}
+                  {t("detail.exactCoordinatesUnavailable")}
+                </p>
+              )}
+            </section>
           </div>
 
           <article className="detail-content">
@@ -499,32 +597,97 @@ export default function ItemDetail({ id }: { id: string }) {
                 <span /> {statusLabels[item.status]}
               </span>
               {isOwnItem && <span className="demo-owner-label">{t("detail.ownItem")}</span>}
+              {isOwnItem && (
+              <div className={`owner-controls${isOwnerControlsExpanded ? " is-expanded" : ""}`}>
+                <Button
+                  aria-controls={isOwnerControlsExpanded ? "owner-actions" : undefined}
+                  aria-expanded={isOwnerControlsExpanded}
+                  className="owner-controls-toggle"
+                  onClick={() => setIsOwnerControlsExpanded((expanded) => !expanded)}
+                  variant="outlined"
+                >
+                  {isOwnerControlsExpanded ? t("detail.hideControls") : t("detail.edit")}
+                </Button>
+                {isOwnerControlsExpanded && (
+                  <div className="owner-actions" id="owner-actions">
+                    <Button onClick={isEditing ? () => setIsEditing(false) : beginEditing} variant="outlined">
+                      {isEditing ? t("detail.cancelEdit") : t("detail.editDetails")}
+                    </Button>
+                    <Dialog
+                      fullWidth
+                      maxWidth="sm"
+                      onClose={() => setIsEditing(false)}
+                      open={isEditing}
+                    >
+                      <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+                        <span>{t("detail.edit")}</span>
+                        <IconButton aria-label={t("detail.close")} onClick={() => setIsEditing(false)} size="small">
+                          ×
+                        </IconButton>
+                      </DialogTitle>
+                      <DialogContent>
+                        <form className="item-edit-form" id="edit-item-form" onSubmit={handleEditSubmit}>
+                          <label className="form-group"><span className="form-label">{t("form.itemName")}</span><input maxLength={80} onChange={(event) => setEditTitle(event.target.value)} required value={editTitle} /></label>
+                          <label className="form-group"><span className="form-label">{t("form.whatHappened")}</span><select onChange={(event) => { if (event.target.value === "lost" || event.target.value === "found") { setEditType(event.target.value); if (event.target.value === "found") { setEditRewardEnabled(false); setEditRewardAmount(""); } } }} value={editType}><option value="lost">{t("form.lostByMe")}</option><option value="found">{t("form.foundByMe")}</option></select></label>
+                          <label className="form-group"><span className="form-label">{t("form.category")}</span><select onChange={(event) => setEditCategory(event.target.value)} required value={editCategory}>{ITEM_CATEGORIES.map((category) => { const key = categoryTranslationKey(category); return <option key={category} value={category}>{key ? t(key) : category}</option>; })}</select></label>
+                          <div className="form-group"><span className="form-label">{t("form.location")}</span><MapLocationPicker compact language={language} onChange={setEditLocation} value={editLocation} /></div>
+                          <label className="form-group"><span className="form-label">{t("form.date")}</span><input onChange={(event) => setEditDate(event.target.value)} required type="date" value={editDate} /></label>
+                          <label className="form-group"><span className="form-label">{t("form.price")}</span><input max={9_999_999_999.99} min={0} onChange={(event) => setEditPrice(event.target.value)} step="0.01" type="number" value={editPrice} /></label>
+                          <RewardAmountField
+                            amount={editRewardAmount}
+                            enabled={editRewardEnabled}
+                            itemType={editType}
+                            onAmountChange={setEditRewardAmount}
+                            onEnabledChange={(enabled) => {
+                              setEditRewardEnabled(enabled);
+                              if (!enabled) setEditRewardAmount("");
+                            }}
+                          />
+                          <label className="form-group"><span className="form-label">{t("form.description")}</span><textarea maxLength={1500} onChange={(event) => setEditDetails(event.target.value)} rows={4} value={editDetails} /></label>
+                          <label className="form-group"><span className="form-label">Telegram</span><input maxLength={33} onChange={(event) => setEditTelegram(event.target.value)} required value={editTelegram} /></label>
+                        </form>
+                      </DialogContent>
+                      <DialogActions sx={{ padding: "0 24px 20px" }}>
+                        <Button onClick={() => setIsEditing(false)} variant="outlined">{t("form.cancel")}</Button>
+                        <Button disabled={isSavingEdit} form="edit-item-form" type="submit" variant="contained">
+                          {isSavingEdit ? t("form.savingChanges") : t("form.saveChanges")}
+                        </Button>
+                      </DialogActions>
+                    </Dialog>
+                    <label htmlFor="item-status">{t("detail.status")}</label>
+                    <select
+                      id="item-status"
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (
+                          value === "searching" ||
+                          value === "returned"
+                        ) {
+                          handleStatusChange(value);
+                        }
+                      }}
+                      value={item.status}
+                    >
+                      {Object.entries(statusLabels).filter(([value]) => value !== "found").map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      className="delete-item-button"
+                      onClick={handleDelete}
+                      variant="outlined"
+                    >
+                      {t("detail.delete")}
+                    </Button>
+                  </div>
+                )}
+              </div>
+              )}
             </div>
 
-            <h1>{item.title}</h1>
-            {item.ownerUsername && (
-              <Link className="detail-author" href={`/u/${encodeURIComponent(item.ownerUsername)}`}>
-                {item.ownerFullName || `@${item.ownerUsername}`}
-                {item.ownerVerified && <VerifiedBadge />}
-              </Link>
-            )}
-            <span className="category-label detail-category">
-              {categoryTranslationKey(item.category)
-                ? t(categoryTranslationKey(item.category)!)
-                : item.category}
-            </span>
-            {item.price != null && (
-              <p className="detail-price">
-                <span>{t("detail.price")}</span>
-                <strong>
-                  {new Intl.NumberFormat(locale, {
-                    style: "currency",
-                    currency: "KZT",
-                    maximumFractionDigits: 2,
-                  }).format(item.price)}
-                </strong>
-              </p>
-            )}
+            <h1>{localizedItem?.title ?? item.title}</h1>
             {item.type === "lost" && item.rewardAmount != null && (
               <p className="detail-reward">
                 <span>{t("detail.reward")}</span>
@@ -537,26 +700,44 @@ export default function ItemDetail({ id }: { id: string }) {
                 </strong>
               </p>
             )}
-            <div className="detail-quick-actions">
-              <Button
-                aria-pressed={favoriteIds.includes(item.id)}
-                className={`favorite-item-button${favoriteIds.includes(item.id) ? " is-favorite" : ""}`}
-                onClick={() => {
-                  if (!user) {
-                    router.push("/login");
-                    return;
-                  }
-                  toggleFavorite(item.id);
-                }}
-                variant="outlined"
-              >
-                <span aria-hidden="true">{favoriteIds.includes(item.id) ? "♥" : "♡"}</span>
-                {favoriteIds.includes(item.id) ? "В избранном" : "В избранное"}
-              </Button>
+            {item.ownerUsername && (
+              <div className="detail-author-block">
+                <span className="detail-author-label">{t("detail.author")}</span>
+                <Link className="detail-author" href={`/u/${encodeURIComponent(item.ownerUsername)}`}>
+                  <span aria-hidden="true" className="detail-author-avatar">
+                    {(item.ownerFullName?.trim() || item.ownerUsername).charAt(0).toLocaleUpperCase(locale)}
+                  </span>
+                  <span className="detail-author-copy">
+                    <span className="detail-author-name">
+                      {item.ownerFullName?.trim() || `@${item.ownerUsername}`}
+                      {item.ownerVerified && <VerifiedBadge />}
+                    </span>
+                    {item.ownerFullName?.trim() && (
+                      <span className="detail-author-username">@{item.ownerUsername}</span>
+                    )}
+                  </span>
+                  <span aria-hidden="true" className="detail-author-arrow">↗</span>
+                </Link>
+              </div>
+            )}
+            {item.price != null && (
+              <p className="detail-price">
+                <span>{t("detail.price")}</span>
+                <strong>
+                  {new Intl.NumberFormat(locale, {
+                    style: "currency",
+                    currency: "KZT",
+                    maximumFractionDigits: 2,
+                  }).format(item.price)}
+                </strong>
+              </p>
+            )}
+            <div className="detail-action-area">
               {item.type === "lost" && item.status !== "returned" && !isExampleItem && (
                 <Button
+                  aria-label={isSubscribed(item.id) ? t("detail.subscribed") : t("detail.subscribe")}
                   aria-pressed={isSubscribed(item.id)}
-                  className={`item-subscription-button${isSubscribed(item.id) ? " is-subscribed" : ""}`}
+                  className={`detail-subscription-button item-subscription-button${isSubscribed(item.id) ? " is-subscribed" : ""}`}
                   onClick={() => {
                     if (!user) {
                       router.push("/login");
@@ -566,24 +747,53 @@ export default function ItemDetail({ id }: { id: string }) {
                       unsubscribeFromItem(item.id);
                       return;
                     }
-                    if (window.confirm(`Подписаться на новые находки, похожие на «${item.title}»?`)) {
+                    if (window.confirm(t("detail.subscribeConfirm").replace("{title}", localizedItem?.title ?? item.title))) {
                       subscribeToItem(item);
                     }
                   }}
+                  title={isSubscribed(item.id) ? t("detail.subscribed") : t("detail.subscribe")}
                   variant="outlined"
                 >
                   <span aria-hidden="true">{isSubscribed(item.id) ? "✓" : "♧"}</span>
-                  {isSubscribed(item.id) ? "Уведомления включены" : "Следить за находками"}
+                  {isSubscribed(item.id) ? t("detail.subscribed") : t("detail.subscribe")}
                 </Button>
               )}
-              <Button className="share-item-button" onClick={handleShare} variant="outlined">
-                Поделиться <span aria-hidden="true">↗</span>
-              </Button>
+              <div className="detail-quick-actions">
+                <Button
+                  aria-label={favoriteIds.includes(item.id) ? t("favorites.remove") : t("favorites.add")}
+                  aria-pressed={favoriteIds.includes(item.id)}
+                  className={`favorite-item-button${favoriteIds.includes(item.id) ? " is-favorite" : ""}`}
+                  onClick={() => {
+                    if (!user) {
+                      router.push("/login");
+                      return;
+                    }
+                    toggleFavorite(item.id);
+                  }}
+                  title={favoriteIds.includes(item.id) ? t("favorites.remove") : t("favorites.add")}
+                  variant="outlined"
+                >
+                  <span aria-hidden="true">{favoriteIds.includes(item.id) ? "♥" : "♡"}</span>
+                </Button>
+                <Button
+                  aria-label={t("detail.share")}
+                  className="share-item-button"
+                  onClick={handleShare}
+                  title={t("detail.share")}
+                  variant="outlined"
+                >
+                  <span aria-hidden="true">↗</span>
+                </Button>
+              </div>
             </div>
 
             {(storageError || actionError || favoritesError || notificationsError) && (
               <Alert className="detail-alert" severity="error">
-                {storageError || actionError || favoritesError || notificationsError}
+                {localizedError(
+                  language,
+                  storageError || actionError || favoritesError || notificationsError,
+                  "detail.error.general",
+                )}
               </Alert>
             )}
             {reportMessage && (
@@ -596,7 +806,7 @@ export default function ItemDetail({ id }: { id: string }) {
               <div>
                 <dt>{t("detail.place")}</dt>
                 <dd>
-                  <span aria-hidden="true">⌖</span> {item.place}
+                  <span aria-hidden="true">⌖</span> {localizedItem?.place ?? item.place}
                 </dd>
               </div>
               <div>
@@ -619,6 +829,19 @@ export default function ItemDetail({ id }: { id: string }) {
             {sightingNotice && <Alert className="detail-alert" severity="success">{sightingNotice}</Alert>}
             {sightingError && <Alert className="detail-alert" severity="error">{sightingError}</Alert>}
 
+            <details className="detail-description">
+              <summary>
+                <span
+                  aria-level={2}
+                  className="detail-description-heading"
+                  role="heading"
+                >
+                  {t("detail.description")}
+                </span>
+              </summary>
+              <p>{(localizedItem?.details ?? item.details) || t("detail.noDescription")}</p>
+            </details>
+
             {item.type === "lost" &&
               user &&
               (isOwnItem || visibleSightings.length > 0) && (
@@ -628,89 +851,157 @@ export default function ItemDetail({ id }: { id: string }) {
                   id="item-sightings"
                   ref={sightingsSectionRef}
                 >
-                  <header className="item-sightings-heading">
-                    <div>
-                      <span className="section-kicker">📍</span>
-                      <h2 id="item-sightings-title">{t("sighting.listTitle")}</h2>
-                    </div>
-                    {isOwnItem && <span>{visibleSightings.length}</span>}
-                  </header>
-                  {visibleSightings.length === 0 ? (
-                    <p className="item-sightings-empty">{t("sighting.empty")}</p>
-                  ) : (
-                    <>
-                      <ItemSightingMap
-                        highlightSightingId={requestedSightingId}
-                        mode="sightings"
-                        sightings={visibleSightings}
-                      />
-                      <div className="item-sighting-list">
-                        {visibleSightings.map((sighting) => (
-                          <article
-                            className="item-sighting-card"
-                            id={`item-sighting-${sighting.id}`}
-                            key={sighting.id}
+                  <Button
+                    aria-controls="item-sightings-content"
+                    aria-expanded={isSightingsListExpanded}
+                    className="item-sightings-list-toggle"
+                    onClick={() =>
+                      setSightingsListExpansion({
+                        requestedSightingId,
+                        expanded: !isSightingsListExpanded,
+                      })
+                    }
+                    type="button"
+                    variant="outlined"
+                  >
+                    <span aria-hidden="true" className="section-kicker">📍</span>
+                    <span className="item-sightings-list-title" id="item-sightings-title">
+                      {t(isSightingsListExpanded ? "sighting.hideList" : "sighting.listTitle")}
+                    </span>
+                    {isOwnItem && (
+                      <span className="item-sightings-list-count">
+                        {visibleSightings.length}
+                      </span>
+                    )}
+                  </Button>
+                  <div
+                    className="item-sightings-content"
+                    hidden={!isSightingsListExpanded}
+                    id="item-sightings-content"
+                  >
+                    {visibleSightings.length === 0 ? (
+                      <p className="item-sightings-empty">{t("sighting.empty")}</p>
+                    ) : (
+                      <>
+                        <div className="item-sightings-map">
+                          <header className="item-sightings-heading">
+                            <Button
+                              aria-controls="item-sightings-map-content"
+                              aria-expanded={isSightingMapExpanded}
+                              className="item-sightings-map-toggle"
+                              onClick={() =>
+                                setSightingMapExpansion({
+                                  requestedSightingId,
+                                  expanded: !isSightingMapExpanded,
+                                })
+                              }
+                              type="button"
+                              variant="outlined"
+                            >
+                              {t(isSightingMapExpanded ? "sighting.hideMap" : "sighting.showMap")}
+                            </Button>
+                          </header>
+                          <div
+                            className="item-sightings-map-content"
+                            id="item-sightings-map-content"
                           >
-                            <div className="item-sighting-byline">
-                              <strong>
-                                {sighting.userId === user.id
-                                  ? t("sighting.you")
-                                  : sighting.fullName || `@${sighting.username}`}
-                              </strong>
-                              <time dateTime={sighting.observedAt}>
-                                {new Intl.DateTimeFormat(locale, {
-                                  day: "numeric",
-                                  month: "long",
-                                  year: "numeric",
-                                }).format(new Date(`${sighting.observedAt}T12:00:00`))}
-                              </time>
-                            </div>
-                            {sighting.address && (
-                              <p>
-                                <strong>{t("sighting.address")}:</strong> {sighting.address}
-                              </p>
+                            {isSightingMapExpanded && (
+                              <ItemSightingMap
+                                highlightSightingId={requestedSightingId}
+                                mode="sightings"
+                                sightings={visibleSightings}
+                              />
                             )}
-                            {sighting.comment && <p>{sighting.comment}</p>}
-                            <small>
-                              {sighting.latitude.toFixed(5)}, {sighting.longitude.toFixed(5)}
-                            </small>
-                            {isOwnItem && sighting.userId !== user.id && (
-                              <Button
-                                disabled={contactingSightingId === sighting.id}
-                                onClick={() => void openSightingChat(sighting)}
-                                variant="outlined"
-                              >
-                                {contactingSightingId === sighting.id
-                                  ? t("sighting.openingChat")
-                                  : t("sighting.openChat")}
-                              </Button>
-                            )}
-                          </article>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                          </div>
+                        </div>
+                        <div className="item-sighting-list">
+                          {visibleSightings.map((sighting) => (
+                            <details
+                              className="item-sighting-card"
+                              id={`item-sighting-${sighting.id}`}
+                              key={sighting.id}
+                              open={sighting.id === requestedSightingId}
+                            >
+                              <summary className="item-sighting-summary">
+                                <span className="item-sighting-byline">
+                                  <strong>
+                                    {sighting.userId === user.id
+                                      ? t("sighting.you")
+                                      : sighting.fullName || `@${sighting.username}`}
+                                  </strong>
+                                  <time dateTime={sighting.observedAt}>
+                                    {new Intl.DateTimeFormat(locale, {
+                                      day: "numeric",
+                                      month: "long",
+                                      year: "numeric",
+                                    }).format(new Date(`${sighting.observedAt}T12:00:00`))}
+                                  </time>
+                                </span>
+                              </summary>
+                              <div className="item-sighting-details">
+                                {sighting.address && (
+                                  <p>
+                                    <strong>{t("sighting.address")}:</strong> {sighting.address}
+                                  </p>
+                                )}
+                                {sighting.photoUrl && (
+                                  <a
+                                    className="item-sighting-photo"
+                                    href={sighting.photoUrl}
+                                    rel="noreferrer"
+                                    target="_blank"
+                                  >
+                                    <Image
+                                      alt={t("sighting.photoAlt")}
+                                      fill
+                                      sizes="320px"
+                                      src={sighting.photoUrl}
+                                      unoptimized
+                                    />
+                                  </a>
+                                )}
+                                {sighting.comment && <p>{sighting.comment}</p>}
+                                <small>
+                                  {sighting.latitude.toFixed(5)}, {sighting.longitude.toFixed(5)}
+                                </small>
+                                {isOwnItem && sighting.userId !== user.id && (
+                                  <Button
+                                    disabled={contactingSightingId === sighting.id}
+                                    onClick={() => void openSightingChat(sighting)}
+                                    variant="outlined"
+                                  >
+                                    {contactingSightingId === sighting.id
+                                      ? t("sighting.openingChat")
+                                      : t("sighting.openChat")}
+                                  </Button>
+                                )}
+                              </div>
+                            </details>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </section>
               )}
-
-            <div className="detail-description">
-                <h2>{t("detail.description")}</h2>
-                <p>{item.details || t("detail.noDescription")}</p>
-            </div>
 
             <Dialog
               className="sighting-dialog"
               fullWidth
               maxWidth="md"
               onClose={() => {
-                if (!isSubmittingSighting) setIsSightingDialogOpen(false);
+                if (!isSubmittingSighting) closeSightingDialog();
               }}
               open={isSightingDialogOpen}
             >
               <DialogTitle>{t("sighting.title")}</DialogTitle>
               <DialogContent>
                 <p className="sighting-dialog-help">{t("sighting.help")}</p>
-                {sightingError && <Alert severity="error">{sightingError}</Alert>}
+                {sightingError && (
+                  <Alert severity="error">
+                    {localizedError(language, sightingError, "sighting.error.general")}
+                  </Alert>
+                )}
                 <p className="sighting-map-instructions">{t("sighting.pickLocation")}</p>
                 <MapLocationPicker
                   compact
@@ -749,12 +1040,56 @@ export default function ItemDetail({ id }: { id: string }) {
                       value={sightingComment}
                     />
                   </label>
+                  <div className="form-group">
+                    <span className="form-label">{t("sighting.photo")}</span>
+                    <label className="sighting-photo-picker">
+                      <input
+                        accept={SIGHTING_PHOTO_ACCEPT}
+                        disabled={isSubmittingSighting}
+                        onChange={handleSightingPhotoChange}
+                        type="file"
+                      />
+                      <span aria-hidden="true">＋</span>
+                      <span>{t("sighting.addPhoto")}</span>
+                    </label>
+                    <small className="sighting-photo-hint">{t("sighting.photoTypes")}</small>
+                    {sightingPhotoError && (
+                      <span className="field-error" role="alert">
+                        {sightingPhotoError}
+                      </span>
+                    )}
+                    {sightingPhotoPreviewUrl && (
+                      <div className="sighting-photo-preview">
+                        <div className="sighting-photo-preview-image">
+                          <Image
+                            alt={t("sighting.photoAlt")}
+                            fill
+                            sizes="320px"
+                            src={sightingPhotoPreviewUrl}
+                            unoptimized
+                          />
+                        </div>
+                        <Button
+                          disabled={isSubmittingSighting}
+                          onClick={() => {
+                            setSightingPhoto(null);
+                            setSightingPhotoPreviewUrl("");
+                            setSightingPhotoError("");
+                          }}
+                          type="button"
+                          variant="outlined"
+                        >
+                          {t("sighting.removePhoto")}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </form>
               </DialogContent>
               <DialogActions>
                 <Button
                   disabled={isSubmittingSighting}
-                  onClick={() => setIsSightingDialogOpen(false)}
+                  onClick={closeSightingDialog}
                   variant="outlined"
                 >
                   {t("sighting.cancel")}
@@ -786,13 +1121,28 @@ export default function ItemDetail({ id }: { id: string }) {
             {isOwnItem && item.type === "lost" && (() => {
               const matches = getSimilarFoundItems(item, storedItems);
               const currentStep = getLostItemProgress(item, matches.length > 0);
-              const steps = ["Объявление опубликовано", "Ищем совпадения", "Есть похожая находка", "Вещь возвращена"];
+              const steps = [
+                t("detail.progress.published"),
+                t("detail.progress.searching"),
+                t("detail.progress.match"),
+                t("detail.progress.returned"),
+              ];
               return (
-                <section className="item-progress-panel" aria-label="Прогресс поиска">
-                  <div className="account-section-heading">
-                    <div><span className="section-kicker">ПРОГРЕСС ПОИСКА</span><h2>Путь вашей вещи</h2></div>
-                    <span className="progress-current-label">{steps[currentStep]}</span>
-                  </div>
+                <details className="item-progress-panel" aria-label={t("detail.progress.aria")}>
+                  <summary className="item-progress-summary">
+                    <span className="item-progress-title">
+                      <span className="section-kicker">{t("detail.progress.kicker")}</span>
+                      <span aria-level={2} className="item-progress-heading" role="heading">
+                        {t("detail.progress.title")}
+                      </span>
+                      <span className="progress-current-label">{steps[currentStep]}</span>
+                    </span>
+                    <span className="item-progress-summary-action">
+                      <span className="item-progress-show-label">{t("detail.progress.showSteps")}</span>
+                      <span className="item-progress-hide-label">{t("detail.progress.hideSteps")}</span>
+                      <span aria-hidden="true" className="item-progress-chevron">⌄</span>
+                    </span>
+                  </summary>
                   <div className="item-progress-steps">
                     {steps.map((step, index) => (
                       <div className={`item-progress-step${index <= currentStep ? " is-complete" : ""}${index === currentStep ? " is-current" : ""}`} key={step}>
@@ -804,18 +1154,18 @@ export default function ItemDetail({ id }: { id: string }) {
                   {matches.length > 0 && (
                     <div className="item-match-hint">
                       <span aria-hidden="true">✦</span>
-                      <p>Нашли {matches.length === 1 ? "похожее объявление" : "похожие объявления"} в кампусе.</p>
+                      <p>{t(matches.length === 1 ? "detail.progress.matchOne" : "detail.progress.matchMany")}</p>
                       <button
                         className="item-match-notifications-button"
-                        onClick={() => window.dispatchEvent(new Event(OPEN_NOTIFICATIONS_EVENT))}
+                        onClick={() => router.push("/notifications")}
                         type="button"
                       >
-                        Посмотреть совпадения
+                        {t("detail.progress.viewMatches")}
                       </button>
                     </div>
                   )}
-                  {item.status === "returned" && <p className="progress-success-note">Поиск завершён: объявление отмечено как возвращённое.</p>}
-                </section>
+                  {item.status === "returned" && <p className="progress-success-note">{t("detail.progress.success")}</p>}
+                </details>
               );
             })()}
 
@@ -845,82 +1195,6 @@ export default function ItemDetail({ id }: { id: string }) {
                 </div>
               </div>
             ) : null}
-
-            {isOwnItem && (
-              <div className="owner-actions">
-                <Button onClick={isEditing ? () => setIsEditing(false) : beginEditing} variant="outlined">
-                  {isEditing ? "Отменить редактирование" : "Редактировать объявление"}
-                </Button>
-                <Dialog
-                  fullWidth
-                  maxWidth="sm"
-                  onClose={() => setIsEditing(false)}
-                  open={isEditing}
-                >
-                  <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
-                    <span>Редактировать объявление</span>
-                    <IconButton aria-label="Закрыть" onClick={() => setIsEditing(false)} size="small">
-                      ×
-                    </IconButton>
-                  </DialogTitle>
-                  <DialogContent>
-                    <form className="item-edit-form" id="edit-item-form" onSubmit={handleEditSubmit}>
-                      <label className="form-group"><span className="form-label">Название</span><input maxLength={80} onChange={(event) => setEditTitle(event.target.value)} required value={editTitle} /></label>
-                      <label className="form-group"><span className="form-label">Тип объявления</span><select onChange={(event) => { if (event.target.value === "lost" || event.target.value === "found") { setEditType(event.target.value); if (event.target.value === "found") { setEditRewardEnabled(false); setEditRewardAmount(""); } } }} value={editType}><option value="lost">Потерял</option><option value="found">Нашёл</option></select></label>
-                      <label className="form-group"><span className="form-label">Категория</span><select onChange={(event) => setEditCategory(event.target.value)} required value={editCategory}>{ITEM_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
-                      <div className="form-group"><span className="form-label">Местоположение</span><MapLocationPicker compact language={language} onChange={setEditLocation} value={editLocation} /></div>
-                      <label className="form-group"><span className="form-label">Дата</span><input onChange={(event) => setEditDate(event.target.value)} required type="date" value={editDate} /></label>
-                      <label className="form-group"><span className="form-label">{t("form.price")}</span><input max={9_999_999_999.99} min={0} onChange={(event) => setEditPrice(event.target.value)} step="0.01" type="number" value={editPrice} /></label>
-                      <RewardAmountField
-                        amount={editRewardAmount}
-                        enabled={editRewardEnabled}
-                        itemType={editType}
-                        onAmountChange={setEditRewardAmount}
-                        onEnabledChange={(enabled) => {
-                          setEditRewardEnabled(enabled);
-                          if (!enabled) setEditRewardAmount("");
-                        }}
-                      />
-                      <label className="form-group"><span className="form-label">Описание</span><textarea maxLength={1500} onChange={(event) => setEditDetails(event.target.value)} rows={4} value={editDetails} /></label>
-                      <label className="form-group"><span className="form-label">Telegram</span><input maxLength={33} onChange={(event) => setEditTelegram(event.target.value)} required value={editTelegram} /></label>
-                    </form>
-                  </DialogContent>
-                  <DialogActions sx={{ padding: "0 24px 20px" }}>
-                    <Button onClick={() => setIsEditing(false)} variant="outlined">Отмена</Button>
-                    <Button disabled={isSavingEdit} form="edit-item-form" type="submit" variant="contained">
-                      {isSavingEdit ? "Сохраняем…" : "Сохранить изменения"}
-                    </Button>
-                  </DialogActions>
-                </Dialog>
-                <label htmlFor="item-status">{t("detail.status")}</label>
-                <select
-                  id="item-status"
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (
-                      value === "searching" ||
-                      value === "returned"
-                    ) {
-                      handleStatusChange(value);
-                    }
-                  }}
-                  value={item.status}
-                >
-                  {Object.entries(statusLabels).filter(([value]) => value !== "found").map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  className="delete-item-button"
-                  onClick={handleDelete}
-                  variant="outlined"
-                >
-                  {t("detail.delete")}
-                </Button>
-              </div>
-            )}
 
             {!isExampleItem && (
               <details className="report-box">
@@ -955,32 +1229,6 @@ export default function ItemDetail({ id }: { id: string }) {
             )}
           </article>
         </div>
-
-        <section aria-labelledby="item-location-title" className="item-location-section">
-          <h2 id="item-location-title">
-            {language === "en" ? "Location" : language === "kk" ? "Орналасқан жері" : "Местоположение"}
-          </h2>
-          {item.latitude != null && item.longitude != null ? (
-            <MapLocationPicker
-              language={language}
-              readOnly
-              value={{
-                address: item.place,
-                latitude: item.latitude,
-                longitude: item.longitude,
-              }}
-            />
-          ) : (
-            <p className="item-location-unavailable">
-              {item.place}.{" "}
-              {language === "en"
-                ? "Exact coordinates were not saved for this listing."
-                : language === "kk"
-                  ? "Бұл хабарландыру үшін нақты координаттар сақталмаған."
-                  : "Точные координаты для этого объявления не сохранены."}
-            </p>
-          )}
-        </section>
 
         <div className="detail-back-row">
           <Link href="/">← {t("detail.backAll")}</Link>

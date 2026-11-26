@@ -9,8 +9,11 @@ type ListingCardLabels = {
   foundStatus: string;
   ownerSearch: string;
   more: string;
+  rewardBadge: string;
+  verifiedUser: string;
   addFavorite: string;
   inFavorites: string;
+  removeFavorite: string;
 };
 
 type ListingCardProps = {
@@ -69,7 +72,7 @@ export default function ListingCard({
             {item.type === "lost" && item.rewardAmount != null && item.rewardAmount > 0 && (
               <Chip
                 className="reward-badge"
-                label="💰 ВОЗНАГРАЖДЕНИЕ"
+                label={`💰 ${labels.rewardBadge}`}
                 size="small"
               />
             )}
@@ -104,7 +107,7 @@ export default function ListingCard({
               {item.ownerVerified && (
                 <span
                   className="item-verified-dot"
-                  aria-label="Подтверждённый пользователь"
+                  aria-label={labels.verifiedUser}
                 >
                   ✓
                 </span>
@@ -126,7 +129,7 @@ export default function ListingCard({
         </div>
       </Link>
       <button
-        aria-label={isFavorite ? `Убрать из избранного: ${title}` : `Добавить в избранное: ${title}`}
+        aria-label={`${isFavorite ? labels.removeFavorite : labels.addFavorite}: ${title}`}
         className={`favorite-toggle ${isFavorite ? "is-favorite" : ""}`}
         type="button"
         aria-pressed={isFavorite}

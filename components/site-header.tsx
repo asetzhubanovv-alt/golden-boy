@@ -5,23 +5,21 @@ import { useState } from "react";
 import { useLanguage } from "@/components/language-provider";
 import HeaderAccount from "@/components/header-account";
 import ThemeToggle from "@/components/theme-toggle";
-import { OPEN_NOTIFICATIONS_EVENT } from "@/lib/use-item-notifications";
 import type { Language } from "@/lib/messages";
 
 type SiteHeaderProps = {
-  active?: "feed" | "add" | "item" | "about" | "favorites" | "messages" | "profile" | "none";
+  active?: "feed" | "add" | "item" | "about" | "favorites" | "messages" | "notifications" | "profile" | "none";
 };
 
 export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
   const { language, setLanguage, t } = useLanguage();
   const [unreadCounts, setUnreadCounts] = useState({ chat: 0, notifications: 0 });
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   return (
     <header className="site-header">
       <div className="header-inner container">
         <Link className="brand" href="/" aria-label={t("brand.home")}>
-          <span>foundly</span>
+          <span>Amanat</span>
         </Link>
         <Link className="header-home-link" href="/">
           <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
@@ -48,11 +46,7 @@ export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
               </button>
             ))}
           </div>
-          <HeaderAccount
-            notificationsOpen={notificationsOpen}
-            onNotificationsOpenChange={setNotificationsOpen}
-            onUnreadCountsChange={setUnreadCounts}
-          />
+          <HeaderAccount onUnreadCountsChange={setUnreadCounts} />
           <ThemeToggle />
           <Link className="header-publish-link" href="/add">
             <span aria-hidden="true">＋</span>
@@ -69,9 +63,21 @@ export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
           <span aria-hidden="true">⌂</span>
           <small>{t("nav.mobileHome")}</small>
         </Link>
-        <Link href="/#feed" aria-label={t("nav.mobileSearch")}>
-          <span aria-hidden="true">⌕</span>
-          <small>{t("nav.mobileSearch")}</small>
+        <Link
+          href="/messages"
+          aria-current={active === "messages" ? "page" : undefined}
+          aria-label={`${t("nav.messages")}${unreadCounts.chat ? `: ${unreadCounts.chat}` : ""}`}
+        >
+          <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+            <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.7-3.1A7.5 7.5 0 1 1 20 11.5Z" />
+            <path d="M8.5 11.5h7M8.5 14.5h4" />
+          </svg>
+          <small>{t("nav.mobileMessages")}</small>
+          {unreadCounts.chat > 0 && (
+            <span aria-hidden="true" className="mobile-tab-count-badge">
+              {unreadCounts.chat > 99 ? "99+" : unreadCounts.chat}
+            </span>
+          )}
         </Link>
         <Link
           href="/add"
@@ -82,34 +88,9 @@ export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
           <small>{t("nav.mobileAdd")}</small>
         </Link>
         <Link
-          href="/messages"
-          aria-current={active === "messages" ? "page" : undefined}
-          aria-label={`${t("nav.messages")}${unreadCounts.chat ? `: ${unreadCounts.chat}` : ""}`}
-        >
-          <span aria-hidden="true">✉</span>
-          <small>{t("nav.mobileMessages")}</small>
-          {unreadCounts.chat > 0 && (
-            <span aria-hidden="true" className="mobile-tab-count-badge">
-              {unreadCounts.chat > 99 ? "99+" : unreadCounts.chat}
-            </span>
-          )}
-        </Link>
-        <button
-          aria-controls="header-notifications-panel"
-          aria-expanded={notificationsOpen}
-          aria-haspopup="dialog"
+          href="/notifications"
+          aria-current={active === "notifications" ? "page" : undefined}
           aria-label={`${t("nav.notifications")}${unreadCounts.notifications ? `: ${unreadCounts.notifications}` : ""}`}
-          className="mobile-notifications-button"
-          onClick={(event) => {
-            if (notificationsOpen) {
-              setNotificationsOpen(false);
-            } else {
-              window.dispatchEvent(new CustomEvent(OPEN_NOTIFICATIONS_EVENT, {
-                detail: { trigger: event.currentTarget },
-              }));
-            }
-          }}
-          type="button"
         >
           <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
             <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" />
@@ -120,13 +101,16 @@ export default function SiteHeader({ active = "none" }: SiteHeaderProps) {
               {unreadCounts.notifications > 99 ? "99+" : unreadCounts.notifications}
             </span>
           )}
-        </button>
+        </Link>
         <Link
           href="/profile"
           aria-current={active === "profile" ? "page" : undefined}
           aria-label={t("nav.mobileProfile")}
         >
-          <span aria-hidden="true">◉</span>
+          <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+            <circle cx="12" cy="7.5" r="3.5" />
+            <path d="M4.5 21c.4-4.1 3.4-6.5 7.5-6.5s7.1 2.4 7.5 6.5" />
+          </svg>
           <small>{t("nav.mobileProfile")}</small>
         </Link>
       </nav>

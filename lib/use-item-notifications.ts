@@ -16,6 +16,8 @@ import { getSimilarFoundItems } from "@/lib/item-matching";
 import { getStoredItems, type Item } from "@/lib/items";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useDemoAuth } from "@/lib/use-demo-auth";
+import { useLanguage } from "@/components/providers/language-provider";
+import { localizedError, translate } from "@/lib/messages";
 
 type ItemMatchNotification = {
   kind: "match";
@@ -67,7 +69,6 @@ export type ItemSubscription = {
 
 const NOTIFICATIONS_EVENT = "foundly-notifications-updated";
 const PERMISSION_EVENT = "foundly-notification-permission-changed";
-export const OPEN_NOTIFICATIONS_EVENT = "foundly-open-notifications";
 const STORAGE_ERROR = "__foundly_notifications_storage_error__";
 
 function storageKey(userId: string) {
@@ -244,6 +245,7 @@ const ItemNotificationsContext = createContext<ItemNotificationsState | null>(nu
 
 function useItemNotificationsClient(userId: string | null): ItemNotificationsState {
   const router = useRouter();
+  const { language } = useLanguage();
   const [syncError, setSyncError] = useState("");
   const [isConnected, setIsConnected] = useState(false);
   const snapshot = useSyncExternalStore(
@@ -325,9 +327,15 @@ function useItemNotificationsClient(userId: string | null): ItemNotificationsSta
       if (showBrowserNotification && permission === "granted" && "Notification" in window) {
         for (const notification of additions) {
           const browserNotification = new window.Notification(
-            `Похожа находка: ${notification.foundTitle}`,
+            translate(language, "notifications.browser.matchTitle").replace(
+              "{title}",
+              notification.foundTitle,
+            ),
             {
-              body: `Ваша вещь «${notification.lostTitle}» может быть здесь: ${notification.foundPlace}`,
+              body: translate(language, "notifications.browser.matchBody").replace(
+                "{place}",
+                notification.foundPlace,
+              ),
               icon: "/favicon.ico",
               tag: notification.id,
             },
@@ -383,7 +391,7 @@ function useItemNotificationsClient(userId: string | null): ItemNotificationsSta
 
       if (showBrowserNotification && permission === "granted" && "Notification" in window) {
         const browserNotification = new window.Notification(
-          "Новый запрос на подтверждение владельца",
+          translate(language, "notifications.browser.ownershipTitle"),
           {
             body: `${item.title}: ${claim.message.slice(0, 180)}`,
             icon: "/favicon.ico",
@@ -457,9 +465,15 @@ function useItemNotificationsClient(userId: string | null): ItemNotificationsSta
 
       if (showBrowserNotification && permission === "granted" && "Notification" in window) {
         const browserNotification = new window.Notification(
-          `Новое наблюдение: ${item.title}`,
+          translate(language, "notifications.browser.sightingTitle").replace(
+            "{title}",
+            item.title,
+          ),
           {
-            body: sighting.comment || `Отметка на карте · ${sighting.observedAt}`,
+            body: sighting.comment || translate(language, "notifications.browser.mapPin").replace(
+              "{date}",
+              sighting.observedAt,
+            ),
             icon: "/favicon.ico",
             tag: notification.id,
           },
@@ -716,7 +730,7 @@ function useItemNotificationsClient(userId: string | null): ItemNotificationsSta
       setIsConnected(false);
       void supabase.removeChannel(channel);
     };
-  }, [permission, router, userId]);
+  }, [language, permission, router, userId]);
 
   const markRead = useCallback((notificationId: string) => {
     if (!userId) return;
@@ -821,7 +835,11 @@ function useItemNotificationsClient(userId: string | null): ItemNotificationsSta
     unreadCount,
     permission,
     isConnected,
-    error: syncError || parsed.error || parsedSubscriptions.error,
+    error: localizedError(
+      language,
+      syncError || parsed.error || parsedSubscriptions.error,
+      "notifications.error.general",
+    ),
     markRead,
     markAllRead,
     isSubscribed,

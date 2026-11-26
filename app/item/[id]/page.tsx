@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useParams } from "next/navigation";
 import ItemDetail from "@/components/item-detail";
+import LocalizedLoading from "@/components/localized-loading";
 
 function ItemRoute() {
   const { id } = useParams<{ id: string }>();
@@ -13,9 +14,7 @@ function ItemRoute() {
 export default function ItemPage() {
   return (
     <Suspense
-      fallback={
-        <main className="detail-loading">Загружаем объявление...</main>
-      }
+      fallback={<LocalizedLoading className="detail-loading" translationKey="route.loading.listing" />}
     >
       <ItemRoute />
     </Suspense>
