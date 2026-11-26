@@ -13,9 +13,10 @@ import { localizedError } from "@/lib/messages";
 
 type DemoAuthFormProps = {
   mode: "login" | "register";
+  embedded?: boolean;
 };
 
-export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
+export default function DemoAuthForm({ mode, embedded = false }: DemoAuthFormProps) {
   const { language, t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,9 +25,11 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
   const redirectPath =
     requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
       ? requestedPath
-      : "/";
+      : embedded
+        ? "/profile"
+        : "/";
   const authSwitchPath = isRegister ? "/login" : "/register";
-  const authSwitchHref = requestedPath
+  const authSwitchHref = requestedPath || embedded
     ? `${authSwitchPath}?next=${encodeURIComponent(redirectPath)}`
     : authSwitchPath;
   const [name, setName] = useState("");
@@ -68,12 +71,8 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
     }
   }
 
-  return (
-    <main className="foundly-shell container-fluid px-0">
-      <SiteHeader />
-
-      <section className="auth-page">
-        <div className="auth-card">
+  const authCard = (
+    <div className={`auth-card${embedded ? " profile-inline-auth-card" : ""}`}>
           <Link className="auth-brand" href="/" aria-label="Amanat">
             <span className="brand-mark">A</span>
             <span>Amanat</span>
@@ -183,9 +182,15 @@ export default function DemoAuthForm({ mode }: DemoAuthFormProps) {
               <Link href="/forgot-password">{t("auth.forgotPassword")}</Link>
             </p>
           )}
-        </div>
-      </section>
+    </div>
+  );
 
+  if (embedded) return authCard;
+
+  return (
+    <main className="foundly-shell container-fluid px-0">
+      <SiteHeader />
+      <section className="auth-page">{authCard}</section>
       <SiteFooter />
     </main>
   );

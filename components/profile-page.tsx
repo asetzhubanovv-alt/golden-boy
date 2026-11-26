@@ -22,6 +22,7 @@ import { deleteStoredItem, getAllItems, updateStoredItem, type Item } from "@/li
 import { getLostItemProgress, getSimilarFoundItems } from "@/lib/item-matching";
 import { useFavoriteItems } from "@/lib/use-favorite-items";
 import RewardAmountField from "@/components/reward-amount-field";
+import DemoAuthForm from "@/components/demo-auth-form";
 import { useLanguage } from "@/components/language-provider";
 import { getMyItemSightings, type ItemSighting } from "@/lib/sightings";
 import { categoryTranslationKey, localizedError } from "@/lib/messages";
@@ -394,7 +395,16 @@ export default function ProfilePage() {
       <section className="profile-edit-page container">
         <BackLink />
         {!isReady ? <p>{t("profile.loading")}</p> : !user ? (
-          <div className="profile-empty"><h1>{t("profile.signInTitle")}</h1><p>{t("profile.signInDescription")}</p><Button href="/login" variant="contained">{t("nav.login")}</Button></div>
+          <div className="profile-empty">
+            <div className="profile-empty-desktop">
+              <h1>{t("profile.signInTitle")}</h1>
+              <p>{t("profile.signInDescription")}</p>
+              <Button href="/login" variant="contained">{t("nav.login")}</Button>
+            </div>
+            <div className="profile-empty-mobile">
+              <DemoAuthForm embedded mode="login" />
+            </div>
+          </div>
         ) : (
           <>
             <header className="profile-page-heading"><span className="section-kicker">{t("profile.kicker")}</span><h1>{t("profile.title")}</h1></header>

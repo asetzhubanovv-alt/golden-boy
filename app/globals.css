@@ -2258,6 +2258,15 @@ html[data-theme="dark"] {
   gap: 10px;
 }
 
+.profile-empty-desktop {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-empty-mobile {
+  display: none;
+}
+
 .admin-heading,
 .admin-section-heading {
   display: flex;
@@ -10403,14 +10412,35 @@ label {
 
   .profile-edit-page:has(.profile-empty) {
     min-height: 0;
+    padding-top: 16px;
     padding-bottom: 24px;
   }
 
+  .profile-edit-page:has(.profile-empty) > .section-back-link,
+  .profile-empty-desktop {
+    display: none;
+  }
+
   .profile-empty {
+    display: block;
     min-height: 0;
-    align-content: start;
-    gap: 12px;
-    padding: 20px 0;
+    padding: 0;
+  }
+
+  .profile-empty-mobile {
+    display: block;
+    width: 100%;
+  }
+
+  .profile-empty-mobile .auth-card {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  .profile-empty-mobile .auth-submit.MuiButton-root {
+    min-height: 50px;
+    margin-top: 0;
   }
 
   .profile-empty h1 {
